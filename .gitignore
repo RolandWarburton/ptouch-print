@@ -1,0 +1,15 @@
+bin/
+web/dist/
+
+# Secrets: never commit. The server writes its API key to /var/lib on the Pi;
+# these are local copies.
+.env
+.env.*
+!.env.example
+/api-key
+
+# Local agent instructions.
+CLAUDE.md
+
+# Local docs, which may hold private details.
+docs/

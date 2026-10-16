@@ -1,0 +1,25 @@
+[Unit]
+Description=Brother P-touch print server (Bluetooth LE)
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+ExecStart=/usr/local/bin/ptouch-print-server -config /etc/ptouch-print-server/config.toml
+User=ptouch
+Group=ptouch
+# /dev/usb/lpN belongs to the lp group.
+SupplementaryGroups=lp bluetooth
+# /var/lib/ptouch-print-server, where the server keeps the API key it generates.
+StateDirectory=ptouch-print-server
+StateDirectoryMode=0700
+# The server exits if bluetoothd stops; this brings it back once bluetoothd is up.
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

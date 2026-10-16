@@ -1,0 +1,18 @@
+{
+  "tasks": {
+    "build": "deno bundle --platform browser --minify --sourcemap=linked -o dist/app.js src/main.ts && cp index.html dist/index.html",
+    "serve": "deno task build && deno run --allow-net=127.0.0.1 --allow-read=dist serve.ts",
+    "check": "deno check src/ serve.ts && deno lint && deno fmt --check",
+    "test": "deno test src/"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  },
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext", "deno.ns"]
+  },
+  "fmt": {
+    "lineWidth": 120
+  },
+  "exclude": ["dist/"]
+}

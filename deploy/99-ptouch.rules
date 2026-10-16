@@ -1,0 +1,2 @@
+# Brother PT-P700: make sure its /dev/usb/lpN is readable and writable by the lp group.
+SUBSYSTEM=="usbmisc", KERNEL=="lp[0-9]*", ATTRS{idVendor}=="04f9", ATTRS{idProduct}=="2061", GROUP="lp", MODE="0660"
