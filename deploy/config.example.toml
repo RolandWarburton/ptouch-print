@@ -1,6 +1,6 @@
 # ptouch-print-server config. Copy to /etc/ptouch-print-server/config.toml.
 
-# How long a request waits for another print job to finish before getting busy.
+# How long a job waits for the printer to finish another one.
 busy_timeout = "30s"
 
 # How long to wait for the printer to answer a status request.
@@ -12,13 +12,12 @@ print_timeout = "20s"
 # Longest label accepted, in dots (180 per inch). 3600 is about 50 cm.
 max_label_dots = 3600
 
-[bluetooth]
-# Advertised device name, 1 to 29 bytes.
-name = "PT-P700"
+[server]
+# The command server. Must be https:// (the token travels in a header).
+url = "https://ptouch.example.com"
 
-# BlueZ adapter.
-adapter = "hci0"
+# The board's token, from `ptouch-command-server token`. Mode 0600, owned by ptouch.
+token_file = "/etc/ptouch-print-server/token"
 
-# Disconnect a client that sends nothing for this long. Must be longer than
-# busy_timeout + status_timeout + print_timeout.
-idle_timeout = "2m"
+# How often to ask for a label. Fixed: the board waits this long after an error too.
+poll_interval = "15s"
