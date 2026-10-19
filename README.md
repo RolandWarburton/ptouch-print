@@ -19,8 +19,6 @@ for a minute, or if it reports the printer can't print. The refusal names the
 problem and how to fix it, e.g. `editor_lite`: "Hold its Editor Lite button
 until the light goes off."
 
-The protocol is in [docs/ptouch-server-spec.md](docs/ptouch-server-spec.md) §8.
-
 ## Tokens
 
 There are three kinds of credential. The server stores only SHA-256 hashes of
