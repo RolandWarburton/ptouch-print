@@ -20,7 +20,7 @@ import (
 	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
 )
 
-var tape24, _ = ptouch.Tape(24)
+var tape24, _ = wire.Tape(24)
 
 // fakePrinter has 24 mm tape loaded unless tapeMM says otherwise. Print
 // renders the label and returns printErr.

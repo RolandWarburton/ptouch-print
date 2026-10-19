@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/ptouch"
 	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
 )
 
@@ -73,10 +72,10 @@ func (p *Poller) printerState(ctx context.Context) (tapeMM int, problem string) 
 	}
 	if len(st.Errors) > 0 {
 		p.Log.Debug("printer status", "errors", st.Errors)
-		return 0, "printer_error"
+		return 0, wire.CodePrinterError
 	}
-	if _, ok := ptouch.Tape(st.TapeMM); !ok {
-		return 0, "unsupported_tape"
+	if _, ok := wire.Tape(st.TapeMM); !ok {
+		return 0, wire.CodeUnsupportedTape
 	}
 	return st.TapeMM, ""
 }

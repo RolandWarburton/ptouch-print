@@ -34,21 +34,21 @@ func Run(ctx context.Context, p Printer, job wire.Job) wire.Result {
 	switch job.Kind {
 	case wire.KindBarcode:
 		if msg := wire.ValidateText(job.Text); msg != "" {
-			return wire.Failed("bad_text", msg)
+			return wire.Failed(wire.CodeBadText, msg)
 		}
-		render = func(t ptouch.TapeSpec) (image.Image, error) { return label.Barcode(job.Text, t.Dots) }
+		render = func(t wire.TapeSpec) (image.Image, error) { return label.Barcode(job.Text, t.Dots) }
 	case wire.KindImage:
 		if job.TapeMM <= 0 {
-			return wire.Failed("bad_request", "image job has no tape_mm")
+			return wire.Failed(wire.CodeBadRequest, "image job has no tape_mm")
 		}
 		img, err := decodePNG(bytes.NewReader(job.Image))
 		if err != nil {
-			return wire.Failed("bad_image", err.Error())
+			return wire.Failed(wire.CodeBadImage, err.Error())
 		}
 		wantMM = job.TapeMM
-		render = func(ptouch.TapeSpec) (image.Image, error) { return img, nil }
+		render = func(wire.TapeSpec) (image.Image, error) { return img, nil }
 	default:
-		return wire.Failed("bad_request", fmt.Sprintf("unknown job kind %q", job.Kind))
+		return wire.Failed(wire.CodeBadRequest, fmt.Sprintf("unknown job kind %q", job.Kind))
 	}
 
 	res, err := p.Print(ctx, wantMM, render)
@@ -83,48 +83,48 @@ func classify(err error) wire.Result {
 	if pe, ok := errors.AsType[*ptouch.PrinterError](err); ok {
 		resp.PrinterErrors = pe.Errors
 		if pe.AfterSend {
-			resp.Code = "print_failed"
+			resp.Code = wire.CodePrintFailed
 		} else {
-			resp.Code = "printer_error"
+			resp.Code = wire.CodePrinterError
 		}
 		return resp
 	}
 	if ue, ok := errors.AsType[*ptouch.UnsupportedTapeError](err); ok {
-		resp.Code, resp.LoadedTapeMM = "unsupported_tape", ue.MM
+		resp.Code, resp.LoadedTapeMM = wire.CodeUnsupportedTape, ue.MM
 		return resp
 	}
 	if me, ok := errors.AsType[*ptouch.TapeMismatchError](err); ok {
-		resp.Code, resp.LoadedTapeMM = "tape_mismatch", me.Loaded
+		resp.Code, resp.LoadedTapeMM = wire.CodeTapeMismatch, me.Loaded
 		return resp
 	}
 	if _, ok := errors.AsType[*ptouch.ImageHeightError](err); ok {
-		resp.Code = "wrong_height"
+		resp.Code = wire.CodeWrongHeight
 		return resp
 	}
 	if _, ok := errors.AsType[*ptouch.LabelTooLongError](err); ok {
-		resp.Code = "too_long"
+		resp.Code = wire.CodeTooLong
 		return resp
 	}
 	switch {
 	case errors.Is(err, ptouch.ErrEmptyLabel):
-		resp.Code = "empty_label"
+		resp.Code = wire.CodeEmptyLabel
 	case errors.Is(err, ptouch.ErrNotConnected):
-		resp.Code = "not_connected"
+		resp.Code = wire.CodeNotConnected
 	case errors.Is(err, ptouch.ErrEditorLite):
-		resp.Code = "editor_lite"
+		resp.Code = wire.CodeEditorLite
 	case errors.Is(err, ptouch.ErrNoReply):
-		resp.Code = "no_reply"
+		resp.Code = wire.CodeNoReply
 	case errors.Is(err, ptouch.ErrBusy):
-		resp.Code = "busy"
+		resp.Code = wire.CodeBusy
 	case errors.Is(err, ptouch.ErrUnconfirmed):
 		// The label may already be on the tape, and jobs are never retried.
-		resp.Code, resp.MayHavePrinted = "unconfirmed", true
+		resp.Code, resp.MayHavePrinted = wire.CodeUnconfirmed, true
 	case errors.Is(err, context.Canceled):
-		resp.Code = "canceled"
+		resp.Code = wire.CodeCanceled
 	case errors.Is(err, ptouch.ErrPermission):
-		resp.Code = "permission"
+		resp.Code = wire.CodePermission
 	default:
-		resp.Code = "internal"
+		resp.Code = wire.CodeInternal
 	}
 	return resp
 }

@@ -24,6 +24,48 @@ const (
 	MaxImageBytes = 1 << 20
 )
 
+// Result codes: why a job failed, or, sent as ProblemParam, why the printer
+// can't print.
+const (
+	CodeBadText         = "bad_text"
+	CodeBadRequest      = "bad_request"
+	CodeBadImage        = "bad_image"
+	CodePrintFailed     = "print_failed" // the printer reported an error after the job was sent
+	CodePrinterError    = "printer_error"
+	CodeUnsupportedTape = "unsupported_tape"
+	CodeTapeMismatch    = "tape_mismatch"
+	CodeWrongHeight     = "wrong_height"
+	CodeTooLong         = "too_long"
+	CodeEmptyLabel      = "empty_label"
+	CodeNotConnected    = "not_connected"
+	CodeEditorLite      = "editor_lite"
+	CodeNoReply         = "no_reply"
+	CodeBusy            = "busy"
+	CodeUnconfirmed     = "unconfirmed" // may have printed
+	CodeCanceled        = "canceled"
+	CodePermission      = "permission"
+	CodeInternal        = "internal"
+)
+
+// TapeSpec is the printable area of one tape width.
+type TapeSpec struct {
+	MM       int
+	Dots     int  // printable height in dots, across the tape
+	Margin   int  // unused print head pins before the printable area
+	Verified bool // geometry confirmed by printing on real tape
+}
+
+var tapes = map[int]TapeSpec{
+	12: {MM: 12, Dots: 70, Margin: 29},
+	24: {MM: 24, Dots: 128, Margin: 0, Verified: true},
+}
+
+// Tape returns the geometry for a supported tape width.
+func Tape(mm int) (TapeSpec, bool) {
+	t, ok := tapes[mm]
+	return t, ok
+}
+
 // ResultPath is where the board reports the result of job id.
 func ResultPath(id int64) string { return "/board/jobs/" + strconv.FormatInt(id, 10) + "/result" }
 
@@ -38,7 +80,7 @@ type Job struct {
 }
 
 // Result is the outcome of a job. Code is empty when the label printed;
-// otherwise it is one of the error codes in the spec, and Error is for people.
+// otherwise it is one of the Code constants, and Error is for people.
 type Result struct {
 	Printed        bool     `json:"printed"`
 	TapeMM         int      `json:"tape_mm,omitempty"`

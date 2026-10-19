@@ -12,6 +12,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
 )
 
 // fakeDevice plays back status replies. Like usblp, it returns EOF once before
@@ -71,7 +73,7 @@ func blankLabel(w, h int) *image.Gray {
 }
 
 func fixed(img image.Image) RenderFunc {
-	return func(TapeSpec) (image.Image, error) { return img, nil }
+	return func(wire.TapeSpec) (image.Image, error) { return img, nil }
 }
 
 func TestEncodeJob(t *testing.T) {
@@ -86,7 +88,7 @@ func TestEncodeJob(t *testing.T) {
 		{12, 3, 0x04, 12, 0x20}, // pins 29 and 98
 	}
 	for _, tt := range tests {
-		tape, _ := Tape(tt.mm)
+		tape, _ := wire.Tape(tt.mm)
 		img := blankLabel(2, tape.Dots)
 		img.SetGray(0, 0, color.Gray{})           // first printable row, column 0
 		img.SetGray(1, tape.Dots-1, color.Gray{}) // last printable row, column 1
@@ -169,8 +171,8 @@ func TestStatusBadReply(t *testing.T) {
 
 func TestPrint(t *testing.T) {
 	dev := &fakeDevice{replies: [][]byte{reply(24, 0, 0, 0), reply(24, 0, 0, statusTypeCompleted)}}
-	var rendered TapeSpec
-	res, err := testPrinter(dev).Print(context.Background(), 0, func(t TapeSpec) (image.Image, error) {
+	var rendered wire.TapeSpec
+	res, err := testPrinter(dev).Print(context.Background(), 0, func(t wire.TapeSpec) (image.Image, error) {
 		rendered = t
 		return blankLabel(10, t.Dots), nil
 	})
@@ -259,7 +261,7 @@ func TestPrintUnconfirmed(t *testing.T) {
 func TestPrintClientGone(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	dev := &fakeDevice{replies: [][]byte{reply(24, 0, 0, 0)}}
-	_, err := testPrinter(dev).Print(ctx, 0, func(t TapeSpec) (image.Image, error) {
+	_, err := testPrinter(dev).Print(ctx, 0, func(t wire.TapeSpec) (image.Image, error) {
 		cancel()
 		return blankLabel(10, t.Dots), nil
 	})

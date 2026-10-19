@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/ptouch"
 	"github.com/RolandWarburton/ptouch-print-server/internal/store"
 	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
 )
@@ -56,14 +55,14 @@ type Service struct {
 
 // problems says how to fix each reason the board gives for not printing.
 var problems = map[string]string{
-	"editor_lite":       "The printer is in Editor Lite mode. Hold its Editor Lite button until the light goes off.",
-	"not_connected":     "The board can't find the printer. Check it's switched on and plugged into the board's data USB port.",
-	"printer_error":     "The printer reports an error, such as its cover open or no tape. Check the printer.",
-	"unsupported_tape":  "The loaded tape isn't supported. Load 12 or 24 mm tape.",
-	"permission":        "The board isn't allowed to open the printer. That's a setup problem on the board (its udev rule or lp group).",
-	"no_reply":          "The printer didn't answer the board. Try switching it off and on.",
-	"busy":              "The printer is busy with something else.",
-	"printer_not_ready": "The board says the printer can't print but not why. Check the printer.",
+	wire.CodeEditorLite:      "The printer is in Editor Lite mode. Hold its Editor Lite button until the light goes off.",
+	wire.CodeNotConnected:    "The board can't find the printer. Check it's switched on and plugged into the board's data USB port.",
+	wire.CodePrinterError:    "The printer reports an error, such as its cover open or no tape. Check the printer.",
+	wire.CodeUnsupportedTape: "The loaded tape isn't supported. Load 12 or 24 mm tape.",
+	wire.CodePermission:      "The board isn't allowed to open the printer. That's a setup problem on the board (its udev rule or lp group).",
+	wire.CodeNoReply:         "The printer didn't answer the board. Try switching it off and on.",
+	wire.CodeBusy:            "The printer is busy with something else.",
+	"printer_not_ready":      "The board says the printer can't print but not why. Check the printer.",
 }
 
 // notReady is the refusal for a board that polls without a ready printer.
@@ -207,7 +206,7 @@ func (s *Service) Status() BoardStatus {
 	st := BoardStatus{Online: s.now().Sub(last) <= OfflineAfter, LastPoll: &last}
 	if st.Online {
 		st.TapeMM, st.Problem = tape, problem
-		if t, ok := ptouch.Tape(tape); ok {
+		if t, ok := wire.Tape(tape); ok {
 			st.HeightDots = t.Dots
 		}
 	}
