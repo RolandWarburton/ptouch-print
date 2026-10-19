@@ -1,34 +1,36 @@
-// Command ptouch-print-server exposes a Brother PT-P700 over Bluetooth LE.
+// Command ptouch-print-server runs on the board: it polls the command server
+// for labels and prints them on a Brother PT-P700.
 package main
 
 import (
 	"context"
-	"crypto/rand"
-	"errors"
 	"flag"
-	"io/fs"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/api"
+	"github.com/RolandWarburton/ptouch-print-server/internal/board"
 	"github.com/RolandWarburton/ptouch-print-server/internal/config"
-	"github.com/RolandWarburton/ptouch-print-server/internal/gatt"
 	"github.com/RolandWarburton/ptouch-print-server/internal/ptouch"
 )
 
 func main() {
 	configPath := flag.String("config", "/etc/ptouch-print-server/config.toml", "path to the config file")
-	// The systemd unit's StateDirectory.
-	keyPath := flag.String("key", "/var/lib/ptouch-print-server/api-key", "path to the API key, generated if missing")
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Error("loading config", "err", err)
+		os.Exit(1)
+	}
+	token, err := os.ReadFile(cfg.Server.TokenFile)
+	if err != nil {
+		log.Error("reading the token (make one with ptouch-command-server token)", "err", err)
 		os.Exit(1)
 	}
 
@@ -38,35 +40,16 @@ func main() {
 		PrintTimeout:  cfg.PrintTimeout.Duration,
 		MaxLabelDots:  cfg.MaxLabelDots,
 	})
-	key, err := apiKey(*keyPath)
-	if err != nil {
-		log.Error("API key", "err", err)
-		os.Exit(1)
-	}
-	svc := api.New(printer, key, log)
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	err = gatt.Serve(ctx, gatt.Config{
-		Adapter:     cfg.Bluetooth.Adapter,
-		Name:        cfg.Bluetooth.Name,
-		IdleTimeout: cfg.Bluetooth.IdleTimeout.Duration,
-		// Let a label that is already printing finish so its result is logged.
-		ShutdownTimeout: cfg.LongestJob(),
-	}, svc, log)
-	if err != nil {
-		log.Error("bluetooth", "err", err)
-		os.Exit(1)
-	}
+	log.Info("polling", "server", cfg.Server.URL, "interval", cfg.Server.PollInterval.Duration)
+	(&board.Poller{
+		ServerURL: cfg.Server.URL,
+		Token:     strings.TrimSpace(string(token)),
+		Interval:  cfg.Server.PollInterval.Duration,
+		Printer:   printer,
+		Client:    &http.Client{Timeout: 30 * time.Second},
+		Log:       log,
+	}).Run(ctx)
 	log.Info("stopped")
-}
-
-// apiKey returns the API key stored at path, generating it on first start.
-func apiKey(path string) (string, error) {
-	b, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		b = []byte(rand.Text())
-		err = os.WriteFile(path, b, 0o600)
-	}
-	return strings.TrimSpace(string(b)), err
 }

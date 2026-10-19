@@ -1,28 +1,27 @@
-// Package config loads the server's TOML config file.
+// Package config loads the board's TOML config file.
 package config
 
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/BurntSushi/toml"
 )
 
-const maxNameLen = 29 // what fits in a scan response
-
 type Config struct {
-	BusyTimeout   Duration  `toml:"busy_timeout"`
-	StatusTimeout Duration  `toml:"status_timeout"`
-	PrintTimeout  Duration  `toml:"print_timeout"`
-	MaxLabelDots  int       `toml:"max_label_dots"`
-	Bluetooth     Bluetooth `toml:"bluetooth"`
+	BusyTimeout   Duration `toml:"busy_timeout"`
+	StatusTimeout Duration `toml:"status_timeout"`
+	PrintTimeout  Duration `toml:"print_timeout"`
+	MaxLabelDots  int      `toml:"max_label_dots"`
+	Server        Server   `toml:"server"`
 }
 
-type Bluetooth struct {
-	Name        string   `toml:"name"`         // advertised device name
-	Adapter     string   `toml:"adapter"`      // BlueZ adapter, e.g. "hci0"
-	IdleTimeout Duration `toml:"idle_timeout"` // disconnect a client that sends nothing for this long
+type Server struct {
+	URL          string   `toml:"url"`           // the command server, e.g. https://ptouch.example.com
+	TokenFile    string   `toml:"token_file"`    // the board's bearer token
+	PollInterval Duration `toml:"poll_interval"` // how often to ask for a job, fixed
 }
 
 // Duration is a time.Duration written in the config as a string like "30s".
@@ -40,10 +39,9 @@ func defaults() Config {
 		StatusTimeout: Duration{3 * time.Second},
 		PrintTimeout:  Duration{20 * time.Second},
 		MaxLabelDots:  3600, // about 50 cm
-		Bluetooth: Bluetooth{
-			Name:        "PT-P700",
-			Adapter:     "hci0",
-			IdleTimeout: Duration{2 * time.Minute},
+		Server: Server{
+			TokenFile:    "/etc/ptouch-print-server/token",
+			PollInterval: Duration{15 * time.Second},
 		},
 	}
 }
@@ -62,7 +60,7 @@ func Load(path string) (Config, error) {
 	var errs []error
 	for name, d := range map[string]Duration{
 		"busy_timeout": c.BusyTimeout, "status_timeout": c.StatusTimeout, "print_timeout": c.PrintTimeout,
-		"bluetooth.idle_timeout": c.Bluetooth.IdleTimeout,
+		"server.poll_interval": c.Server.PollInterval,
 	} {
 		if d.Duration <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be positive", name))
@@ -71,16 +69,11 @@ func Load(path string) (Config, error) {
 	if c.MaxLabelDots <= 0 {
 		errs = append(errs, errors.New("max_label_dots must be positive"))
 	}
-	if n := len(c.Bluetooth.Name); n == 0 || n > maxNameLen {
-		errs = append(errs, fmt.Errorf("bluetooth.name must be 1 to %d bytes", maxNameLen))
+	if err := checkURL(c.Server.URL); err != nil {
+		errs = append(errs, fmt.Errorf("server.url: %w", err))
 	}
-	if c.Bluetooth.Adapter == "" {
-		errs = append(errs, errors.New("bluetooth.adapter is required"))
-	}
-	// The idle check can't tell a client waiting on a slow print from an idle
-	// one, so it must outlast the longest request.
-	if c.Bluetooth.IdleTimeout.Duration > 0 && c.Bluetooth.IdleTimeout.Duration <= c.LongestJob() {
-		errs = append(errs, fmt.Errorf("bluetooth.idle_timeout must be longer than busy_timeout + status_timeout + print_timeout (%v)", c.LongestJob()))
+	if c.Server.TokenFile == "" {
+		errs = append(errs, errors.New("server.token_file is required"))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", path, err)
@@ -88,8 +81,19 @@ func Load(path string) (Config, error) {
 	return c, nil
 }
 
-// LongestJob is the longest a print request can take: waiting its turn, then
-// the status check and the job.
-func (c Config) LongestJob() time.Duration {
-	return c.BusyTimeout.Duration + c.StatusTimeout.Duration + c.PrintTimeout.Duration
+// checkURL insists on HTTPS, since the token travels in a header. Plain HTTP
+// is allowed only to this machine, for testing.
+func checkURL(s string) error {
+	if s == "" {
+		return errors.New("required")
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return err
+	}
+	local := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
+	if u.Host == "" || u.Scheme != "https" && !(u.Scheme == "http" && local) {
+		return fmt.Errorf("%q must be an https:// URL", s)
+	}
+	return nil
 }

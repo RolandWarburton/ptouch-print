@@ -6,12 +6,15 @@ RELEASE := CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags '-s -w'
 
 all: test build arm64 armv7 armv6
 
+# Both binaries for this machine: the board's and the command server.
 build:
-	go build -o bin/$(BIN) $(PKG)
+	go build -o bin/ ./cmd/...
 
 test:
 	go vet ./...
 	go test ./...
+
+# The board's binary. The command server is built by its Dockerfile.
 
 # 64-bit SBCs (Raspberry Pi 3/4/5 on a 64-bit OS, most current boards).
 arm64:

@@ -17,15 +17,27 @@ func writeConfig(t *testing.T, config string) string {
 	return path
 }
 
+const minimal = "[server]\nurl = \"https://ptouch.example.com\"\n"
+
 func TestLoadDefaults(t *testing.T) {
-	c, err := Load(writeConfig(t, ""))
+	c, err := Load(writeConfig(t, minimal))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := defaults()
-	if c.Bluetooth != want.Bluetooth || c.BusyTimeout != want.BusyTimeout || c.StatusTimeout != want.StatusTimeout ||
-		c.PrintTimeout != want.PrintTimeout || c.MaxLabelDots != want.MaxLabelDots {
+	want.Server.URL = "https://ptouch.example.com"
+	if c != want {
 		t.Errorf("got %+v, want defaults %+v", c, want)
+	}
+}
+
+func TestExampleConfigLoads(t *testing.T) {
+	c, err := Load("../../deploy/config.example.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := defaults(); c.BusyTimeout != want.BusyTimeout || c.Server.PollInterval != want.Server.PollInterval {
+		t.Errorf("example doesn't match the defaults: %+v", c)
 	}
 }
 
@@ -35,16 +47,16 @@ busy_timeout = "5s"
 print_timeout = "1m"
 max_label_dots = 1000
 
-[bluetooth]
-name = "Label printer"
-adapter = "hci1"
-idle_timeout = "5m"
+[server]
+url = "http://localhost:8080"
+token_file = "/tmp/token"
+poll_interval = "5s"
 `))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Bluetooth{Name: "Label printer", Adapter: "hci1", IdleTimeout: Duration{5 * time.Minute}}
-	if c.Bluetooth != want || c.BusyTimeout.Duration != 5*time.Second ||
+	want := Server{URL: "http://localhost:8080", TokenFile: "/tmp/token", PollInterval: Duration{5 * time.Second}}
+	if c.Server != want || c.BusyTimeout.Duration != 5*time.Second ||
 		c.PrintTimeout.Duration != time.Minute || c.MaxLabelDots != 1000 {
 		t.Errorf("got %+v", c)
 	}
@@ -54,14 +66,15 @@ func TestLoadErrors(t *testing.T) {
 	tests := []struct {
 		name, config, want string
 	}{
-		{"unknown setting", "lisen = \":80\"", `unknown setting "lisen"`},
-		{"old listen setting", "listen = \":8080\"", `unknown setting "listen"`},
-		{"old api_key_file setting", "api_key_file = \"api-key\"", `unknown setting "api_key_file"`},
-		{"empty name", "[bluetooth]\nname = \"\"", "bluetooth.name"},
-		{"long name", "[bluetooth]\nname = \"" + strings.Repeat("x", 30) + "\"", "bluetooth.name"},
-		{"short idle timeout", "[bluetooth]\nidle_timeout = \"30s\"", "idle_timeout must be longer"},
-		{"bad duration", "busy_timeout = \"soon\"", "busy_timeout"},
-		{"zero timeout", "print_timeout = \"0s\"", "print_timeout must be positive"},
+		{"unknown setting", minimal + "lisen = \":80\"", `unknown setting`},
+		{"old bluetooth section", minimal + "[bluetooth]\nname = \"x\"", `unknown setting "bluetooth`},
+		{"no url", "", "server.url: required"},
+		{"plain http", "[server]\nurl = \"http://ptouch.example.com\"", "must be an https:// URL"},
+		{"no host", "[server]\nurl = \"https://\"", "must be an https:// URL"},
+		{"zero poll", minimal + "poll_interval = \"0s\"", "server.poll_interval must be positive"},
+		{"empty token file", minimal + "token_file = \"\"", "server.token_file is required"},
+		{"bad duration", "busy_timeout = \"soon\"\n" + minimal, "busy_timeout"},
+		{"zero timeout", "print_timeout = \"0s\"\n" + minimal, "print_timeout must be positive"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

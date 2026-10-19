@@ -1,0 +1,58 @@
+# P-touch command server: the board polls it, REST and MCP clients submit to it.
+#
+# Deploy on the host that runs the other MCP servers: copy this project to
+# ~/services/ptouch/, create .env from .env.example, then:
+#
+#   docker compose up -d --build
+#
+# Published through Traefik at https://ptouch.<MCP_DOMAIN>:
+#   /board/*   the board (board token)
+#   /api/*     REST clients (named client tokens, or Dex)
+#   /mcp       claude.ai (Dex client ptouch-mcp) or a client token
+
+name: ptouch
+
+services:
+  ptouch:
+    build: .
+    image: ptouch-command-server:latest
+    container_name: ptouch
+    env_file:
+      - .env
+    environment:
+      GOMEMLIMIT: 48MiB
+    volumes:
+      - jobs:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m # SQLite may spill large sorts to temp files
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "ptouch-command-server", "healthcheck", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ptouch.rule=Host(`${PTOUCH_HOST:-ptouch}.${MCP_DOMAIN:?MCP_DOMAIN must be set in .env}`)"
+      - "traefik.http.routers.ptouch.entrypoints=websecure"
+      - "traefik.http.routers.ptouch.tls=true"
+      - "traefik.http.routers.ptouch.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ptouch.loadbalancer.server.port=8080"
+      - "traefik.docker.network=services"
+
+volumes:
+  jobs:
+
+networks:
+  services:
+    external: true
