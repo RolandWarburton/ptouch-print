@@ -2,7 +2,10 @@
 // the two binaries can't disagree about the format.
 //
 // The board asks for work with GET NextPath?tape_mm=N, getting a Job (200) or
-// nothing (204), and reports each job it took with POST ResultPath(id).
+// nothing (204), and reports each job it took with POST ResultPath(id). When
+// the printer can't print, the poll says tape_mm=0 and adds ProblemParam with
+// the reason, one of the result codes (editor_lite, printer_error, …); a poll
+// without it means the printer is ready.
 package wire
 
 import (
@@ -11,7 +14,8 @@ import (
 )
 
 const (
-	NextPath = "/board/next"
+	NextPath     = "/board/next"
+	ProblemParam = "problem"
 
 	KindBarcode = "barcode"
 	KindImage   = "image"

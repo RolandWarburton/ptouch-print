@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,7 +24,7 @@ type Options struct {
 //
 //	GET  /health                                       unauthenticated, for container health checks
 //	GET  /.well-known/oauth-protected-resource[/mcp]   with Dex: tells claude.ai to sign in there
-//	GET  /board/next?tape_mm=N                         board: take the next job (200) or none (204)
+//	GET  /board/next?tape_mm=N[&problem=CODE]          board: take the next job (200) or none (204)
 //	POST /board/jobs/{id}/result                       board: report a job's result
 //	POST /api/jobs                                     client: submit a job
 //	GET  /api/jobs[?limit=N], /api/jobs/{id}           client: newest jobs, one job
@@ -73,13 +74,22 @@ func NewHandler(svc *Service, opts Options, log *slog.Logger) (http.Handler, err
 
 type handlers struct{ svc *Service }
 
+// problemCode is the shape of the board's reason for not printing. The server
+// shows it, so it accepts codes it doesn't know rather than breaking on a newer board.
+var problemCode = regexp.MustCompile(`^[a-z_]{1,32}$`)
+
 func (h handlers) next(w http.ResponseWriter, r *http.Request) {
 	tape, err := strconv.Atoi(r.URL.Query().Get("tape_mm"))
 	if err != nil || tape < 0 {
 		writeError(w, refuse(http.StatusBadRequest, "bad_request", "tape_mm must be a number of mm, or 0"))
 		return
 	}
-	job, err := h.svc.Next(r.Context(), tape)
+	problem := r.URL.Query().Get(wire.ProblemParam)
+	if problem != "" && !problemCode.MatchString(problem) {
+		writeError(w, refuse(http.StatusBadRequest, "bad_request", "problem must be a lower-case code like editor_lite"))
+		return
+	}
+	job, err := h.svc.Next(r.Context(), tape, problem)
 	switch {
 	case err != nil:
 		writeError(w, err)

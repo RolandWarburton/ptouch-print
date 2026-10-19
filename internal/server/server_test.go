@@ -101,9 +101,10 @@ func TestBarcodeJobLifecycle(t *testing.T) {
 	if code, body := e.do("POST", "/api/jobs", clientToken, barcode); code != 503 || body["code"] != "printer_offline" {
 		t.Fatalf("before the board polls: %d %v", code, body)
 	}
-	e.poll("0")
-	if code, body := e.do("POST", "/api/jobs", clientToken, barcode); code != 503 || body["code"] != "no_tape" {
-		t.Fatalf("no tape: %d %v", code, body)
+	e.poll("0&problem=editor_lite")
+	if code, body := e.do("POST", "/api/jobs", clientToken, barcode); code != 503 || body["code"] != "editor_lite" ||
+		!strings.Contains(body["error"].(string), "Editor Lite button") {
+		t.Fatalf("Editor Lite on: %d %v", code, body)
 	}
 	if code, _ := e.poll("24"); code != 204 {
 		t.Fatalf("empty queue: %d", code)
@@ -148,6 +149,48 @@ func TestOfflineAfterMissedPolls(t *testing.T) {
 	}
 	if _, st := e.do("GET", "/api/status", clientToken, nil); st["online"] != false || st["tape_mm"] != 0.0 {
 		t.Errorf("status %v", st)
+	}
+}
+
+func TestPrinterProblems(t *testing.T) {
+	e := newEnv(t, nil)
+	barcode := map[string]any{"kind": "barcode", "text": "A"}
+	for _, tt := range []struct{ poll, code string }{
+		{"0&problem=printer_error", "printer_error"},
+		{"0&problem=not_connected", "not_connected"},
+		{"0&problem=from_a_newer_board", "from_a_newer_board"},
+		{"0", "printer_not_ready"},
+	} {
+		e.poll(tt.poll)
+		if code, body := e.do("POST", "/api/jobs", clientToken, barcode); code != 503 || body["code"] != tt.code {
+			t.Errorf("poll %s: %d %v, want 503 %s", tt.poll, code, body, tt.code)
+		}
+	}
+	e.poll("0&problem=editor_lite")
+	if _, st := e.do("GET", "/api/status", clientToken, nil); st["problem"] != "editor_lite" || st["tape_mm"] != 0.0 {
+		t.Errorf("status with a problem: %v", st)
+	}
+	// A poll without a problem clears it.
+	e.poll("24")
+	if _, st := e.do("GET", "/api/status", clientToken, nil); st["problem"] != nil || st["tape_mm"] != 24.0 {
+		t.Errorf("status after the fix: %v", st)
+	}
+	if code, _ := e.do("POST", "/api/jobs", clientToken, barcode); code != 201 {
+		t.Errorf("submit after the fix: %d", code)
+	}
+	if code, _ := e.poll("0&problem=Not%20A%20Code"); code != 400 {
+		t.Errorf("malformed problem: %d", code)
+	}
+}
+
+// A job queued before the problem is still handed out, so it fails now
+// instead of printing later.
+func TestQueuedJobHandedOutDespiteProblem(t *testing.T) {
+	e := newEnv(t, nil)
+	e.poll("24")
+	e.do("POST", "/api/jobs", clientToken, map[string]any{"kind": "barcode", "text": "A"})
+	if code, job := e.poll("0&problem=editor_lite"); code != 200 || job["text"] != "A" {
+		t.Errorf("poll with a problem: %d %v", code, job)
 	}
 }
 
@@ -245,6 +288,14 @@ func TestMCPTools(t *testing.T) {
 	}
 	if _, body := rpc(t, e.url, clientToken, "list_jobs", map[string]any{}); !strings.Contains(body, "TG17573") {
 		t.Errorf("list_jobs: %s", body)
+	}
+	if _, body := rpc(t, e.url, clientToken, "printer_status", map[string]any{}); !strings.Contains(body, `\"online\":true`) ||
+		!strings.Contains(body, `\"tape_mm\":24`) {
+		t.Errorf("printer_status: %s", body)
+	}
+	e.poll("0&problem=editor_lite")
+	if _, body := rpc(t, e.url, clientToken, "printer_status", map[string]any{}); !strings.Contains(body, `\"problem\":\"editor_lite\"`) {
+		t.Errorf("printer_status with a problem: %s", body)
 	}
 	if code, _ := rpc(t, e.url, boardToken, "list_jobs", map[string]any{}); code != 401 {
 		t.Errorf("board token on /mcp: %d", code)

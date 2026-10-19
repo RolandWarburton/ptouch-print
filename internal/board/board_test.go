@@ -22,16 +22,23 @@ import (
 
 var tape24, _ = ptouch.Tape(24)
 
-// fakePrinter has 24 mm tape loaded. Print renders the label and returns err.
+// fakePrinter has 24 mm tape loaded unless tapeMM says otherwise. Print
+// renders the label and returns printErr.
 type fakePrinter struct {
-	statusErr error
-	printErr  error
-	gotWantMM int
-	rendered  image.Image
+	statusErr  error
+	statusErrs []string // error bits the printer reports
+	tapeMM     int
+	printErr   error
+	gotWantMM  int
+	rendered   image.Image
 }
 
 func (f *fakePrinter) Status(context.Context) (ptouch.Status, error) {
-	return ptouch.Status{TapeMM: 24, MediaType: 1}, f.statusErr
+	tape := f.tapeMM
+	if tape == 0 {
+		tape = 24
+	}
+	return ptouch.Status{TapeMM: tape, MediaType: 1, Errors: f.statusErrs}, f.statusErr
 }
 
 func (f *fakePrinter) Print(_ context.Context, wantMM int, render ptouch.RenderFunc) (ptouch.Result, error) {
@@ -140,11 +147,12 @@ func TestRunPrinterErrors(t *testing.T) {
 // fakeServer hands out the jobs in queue, one per poll, and records what the
 // board sent.
 type fakeServer struct {
-	mu      sync.Mutex
-	queue   []wire.Job
-	tapes   []string
-	results map[int64]wire.Result
-	auth    []string
+	mu       sync.Mutex
+	queue    []wire.Job
+	tapes    []string
+	problems []string
+	results  map[int64]wire.Result
+	auth     []string
 }
 
 func (s *fakeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +162,7 @@ func (s *fakeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == wire.NextPath:
 		s.tapes = append(s.tapes, r.URL.Query().Get("tape_mm"))
+		s.problems = append(s.problems, r.URL.Query().Get(wire.ProblemParam))
 		if len(s.queue) == 0 {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -206,13 +215,30 @@ func TestPollReportsFailures(t *testing.T) {
 	}
 }
 
-func TestPollNoPrinter(t *testing.T) {
-	s := &fakeServer{results: map[int64]wire.Result{}}
-	if err := newPoller(t, s, &fakePrinter{statusErr: ptouch.ErrNotConnected}).Poll(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if s.tapes[0] != "0" {
-		t.Errorf("tape_mm=%s with no printer, want 0", s.tapes[0])
+func TestPollReportsProblems(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		printer *fakePrinter
+		problem string
+	}{
+		{"ready", &fakePrinter{}, ""},
+		{"no printer", &fakePrinter{statusErr: ptouch.ErrNotConnected}, "not_connected"},
+		{"Editor Lite", &fakePrinter{statusErr: ptouch.ErrEditorLite}, "editor_lite"},
+		{"no reply", &fakePrinter{statusErr: ptouch.ErrNoReply}, "no_reply"},
+		{"cover open", &fakePrinter{statusErrs: []string{"cover open"}}, "printer_error"},
+		{"18 mm tape", &fakePrinter{tapeMM: 18}, "unsupported_tape"},
+	} {
+		s := &fakeServer{results: map[int64]wire.Result{}}
+		if err := newPoller(t, s, tt.printer).Poll(t.Context()); err != nil {
+			t.Fatalf("%s: %v", tt.name, err)
+		}
+		wantTape := "0"
+		if tt.problem == "" {
+			wantTape = "24"
+		}
+		if s.tapes[0] != wantTape || s.problems[0] != tt.problem {
+			t.Errorf("%s: tape_mm=%s problem=%q, want %s %q", tt.name, s.tapes[0], s.problems[0], wantTape, tt.problem)
+		}
 	}
 }
 

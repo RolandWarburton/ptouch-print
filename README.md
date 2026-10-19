@@ -15,7 +15,9 @@ for whatever tape is loaded, or PNGs rendered for a specific tape.
 **Labels are never reprinted automatically.** A job that fails, or might have
 printed but wasn't confirmed, is abandoned; submit a new one if the label really
 didn't come out. Submits are refused straight away if the board hasn't checked in
-for a minute or has no tape loaded.
+for a minute, or if it reports the printer can't print. The refusal names the
+problem and how to fix it, e.g. `editor_lite`: "Hold its Editor Lite button
+until the light goes off."
 
 The protocol is in [docs/ptouch-server-spec.md](docs/ptouch-server-spec.md) §8.
 
@@ -116,12 +118,13 @@ On the Pi:
   ```
 
   Then `GET /api/status` on the server should say `"online": true` with the
-  loaded tape.
+  loaded tape. If the printer can't print, it shows `"problem"` instead, such as
+  `editor_lite` or `printer_error` (cover open, no tape).
 
 ## Print
 
 From Claude, with the connector added: "print a barcode label for TG17573". The
-tools are `print_barcode`, `get_job` and `list_jobs`.
+tools are `print_barcode`, `get_job`, `list_jobs` and `printer_status`.
 
 With a client token:
 

@@ -47,21 +47,56 @@ type Service struct {
 	log   *slog.Logger
 	now   func() time.Time
 
+	// What the board's last poll said: the tape, or 0 and why it can't print.
 	mu       sync.Mutex
 	lastPoll time.Time
-	tapeMM   int // what the board last reported; 0 = no printer or unsupported tape
+	tapeMM   int
+	problem  string
+}
+
+// problems says how to fix each reason the board gives for not printing.
+var problems = map[string]string{
+	"editor_lite":       "The printer is in Editor Lite mode. Hold its Editor Lite button until the light goes off.",
+	"not_connected":     "The board can't find the printer. Check it's switched on and plugged into the board's data USB port.",
+	"printer_error":     "The printer reports an error, such as its cover open or no tape. Check the printer.",
+	"unsupported_tape":  "The loaded tape isn't supported. Load 12 or 24 mm tape.",
+	"permission":        "The board isn't allowed to open the printer. That's a setup problem on the board (its udev rule or lp group).",
+	"no_reply":          "The printer didn't answer the board. Try switching it off and on.",
+	"busy":              "The printer is busy with something else.",
+	"printer_not_ready": "The board says the printer can't print but not why. Check the printer.",
+}
+
+// notReady is the refusal for a board that polls without a ready printer.
+func notReady(problem string) *Error {
+	if problem == "" {
+		problem = "printer_not_ready" // a board too old to say why
+	}
+	msg, ok := problems[problem]
+	if !ok {
+		msg = "The printer can't print right now (" + problem + ")."
+	}
+	return &Error{Status: http.StatusServiceUnavailable, Code: problem, Msg: msg}
 }
 
 func NewService(st *store.Store, log *slog.Logger) *Service {
 	return &Service{store: st, log: log, now: time.Now}
 }
 
-// Next records the board's poll and hands it the oldest queued job, if any.
-func (s *Service) Next(ctx context.Context, tapeMM int) (*wire.Job, error) {
+// Next records the board's poll and hands it the oldest queued job, if any,
+// even while the printer has a problem: that job fails now rather than
+// printing later, unexpectedly.
+func (s *Service) Next(ctx context.Context, tapeMM int, problem string) (*wire.Job, error) {
 	now := s.now()
 	s.mu.Lock()
-	s.lastPoll, s.tapeMM = now, tapeMM
+	was := s.problem
+	s.lastPoll, s.tapeMM, s.problem = now, tapeMM, problem
 	s.mu.Unlock()
+	switch {
+	case problem != was && problem != "":
+		s.log.Warn("printer can't print", "problem", problem)
+	case problem != was:
+		s.log.Info("printer ready again", "was", was)
+	}
 	job, err := s.store.Claim(ctx, now)
 	if job != nil {
 		s.log.Info("job sent", "job", job.ID, "kind", job.Kind)
@@ -117,8 +152,7 @@ func (s *Service) Submit(ctx context.Context, who string, job wire.Job) (store.J
 			"the printer hasn't checked in for over %v; check its power and Wi-Fi", OfflineAfter)
 	}
 	if st.TapeMM == 0 {
-		return store.Job{}, refuse(http.StatusServiceUnavailable, "no_tape",
-			"the board can't see the printer or a supported tape (12 or 24 mm)")
+		return store.Job{}, notReady(st.Problem)
 	}
 	if job.Kind == wire.KindImage {
 		if job.TapeMM != st.TapeMM {
@@ -160,18 +194,19 @@ type BoardStatus struct {
 	LastPoll   *time.Time `json:"last_poll,omitempty"`
 	TapeMM     int        `json:"tape_mm"`
 	HeightDots int        `json:"height_dots,omitempty"` // the image height the tape needs
+	Problem    string     `json:"problem,omitempty"`     // why it can't print, e.g. editor_lite
 }
 
 func (s *Service) Status() BoardStatus {
 	s.mu.Lock()
-	last, tape := s.lastPoll.UTC(), s.tapeMM
+	last, tape, problem := s.lastPoll.UTC(), s.tapeMM, s.problem
 	s.mu.Unlock()
 	if last.IsZero() {
 		return BoardStatus{}
 	}
 	st := BoardStatus{Online: s.now().Sub(last) <= OfflineAfter, LastPoll: &last}
 	if st.Online {
-		st.TapeMM = tape
+		st.TapeMM, st.Problem = tape, problem
 		if t, ok := ptouch.Tape(tape); ok {
 			st.HeightDots = t.Dots
 		}

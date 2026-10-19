@@ -44,7 +44,8 @@ func (p *Poller) Run(ctx context.Context) {
 
 // Poll asks for one job and, if there is one, prints it and reports the result.
 func (p *Poller) Poll(ctx context.Context) error {
-	job, err := p.next(ctx, p.loadedTape(ctx))
+	tapeMM, problem := p.printerState(ctx)
+	job, err := p.next(ctx, tapeMM, problem)
 	if err != nil || job == nil {
 		return err
 	}
@@ -62,22 +63,29 @@ func (p *Poller) Poll(ctx context.Context) error {
 	return nil
 }
 
-// loadedTape is the width of the loaded tape, or 0 when there is no printer or
-// the tape isn't one the server can take jobs for.
-func (p *Poller) loadedTape(ctx context.Context) int {
+// printerState is the width of the loaded tape when the printer is ready to
+// print, or 0 and why not: the same codes a failed job reports.
+func (p *Poller) printerState(ctx context.Context) (tapeMM int, problem string) {
 	st, err := p.Printer.Status(ctx)
 	if err != nil {
 		p.Log.Debug("printer status", "err", err)
-		return 0
+		return 0, classify(err).Code
+	}
+	if len(st.Errors) > 0 {
+		p.Log.Debug("printer status", "errors", st.Errors)
+		return 0, "printer_error"
 	}
 	if _, ok := ptouch.Tape(st.TapeMM); !ok {
-		return 0
+		return 0, "unsupported_tape"
 	}
-	return st.TapeMM
+	return st.TapeMM, ""
 }
 
-func (p *Poller) next(ctx context.Context, tapeMM int) (*wire.Job, error) {
+func (p *Poller) next(ctx context.Context, tapeMM int, problem string) (*wire.Job, error) {
 	url := strings.TrimRight(p.ServerURL, "/") + wire.NextPath + "?tape_mm=" + strconv.Itoa(tapeMM)
+	if problem != "" {
+		url += "&" + wire.ProblemParam + "=" + problem
+	}
 	res, err := p.do(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

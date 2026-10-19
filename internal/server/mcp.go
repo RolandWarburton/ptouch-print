@@ -30,7 +30,8 @@ func NewMCP(svc *Service) *mcp.Server {
 		Instructions: "Prints Code 128 barcode labels on a Brother P-touch label printer. print_barcode only queues " +
 			"the label; it prints within about 20 seconds. Call get_job to confirm, and only tell the user it printed " +
 			"when the status is done. A job is never retried: if it failed, or stays sent, submit a new one only if " +
-			"the user asks, since a label may already have come out.",
+			"the user asks, since a label may already have come out. When print_barcode is refused because the " +
+			"printer can't print, pass on the fix it gives; printer_status shows the same without printing.",
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -53,6 +54,14 @@ func NewMCP(svc *Service) *mcp.Server {
 			return errorResult(err)
 		}
 		return jsonResult(j)
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "printer_status",
+		Description: "Whether the printer can print now: online (checked in within the last minute), the loaded tape, " +
+			"and when it can't print, the problem (e.g. editor_lite, printer_error, not_connected).",
+	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
+		return jsonResult(svc.Status())
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
