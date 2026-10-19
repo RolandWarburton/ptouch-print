@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -20,7 +21,18 @@ import (
 
 func main() {
 	configPath := flag.String("config", "/etc/ptouch-print-server/config.toml", "path to the config file")
+	flag.Usage = func() {
+		fmt.Fprint(flag.CommandLine.Output(), "ptouch-print-server runs on the board: it polls the command server for labels and\n"+
+			"prints them on a Brother PT-P700. The server URL, token file and poll interval are in\n"+
+			"the config file (see deploy/config.example.toml).\n\n"+
+			"Usage: ptouch-print-server [-config PATH]\n\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
+	if flag.NArg() > 0 {
+		flag.Usage()
+		os.Exit(2)
+	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	cfg, err := config.Load(*configPath)
