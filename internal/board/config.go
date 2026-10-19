@@ -1,5 +1,4 @@
-// Package config loads the board's TOML config file.
-package config
+package board
 
 import (
 	"errors"
@@ -10,15 +9,16 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Config is the board's TOML config file.
 type Config struct {
-	BusyTimeout   Duration `toml:"busy_timeout"`
-	StatusTimeout Duration `toml:"status_timeout"`
-	PrintTimeout  Duration `toml:"print_timeout"`
-	MaxLabelDots  int      `toml:"max_label_dots"`
-	Server        Server   `toml:"server"`
+	BusyTimeout   Duration     `toml:"busy_timeout"`
+	StatusTimeout Duration     `toml:"status_timeout"`
+	PrintTimeout  Duration     `toml:"print_timeout"`
+	MaxLabelDots  int          `toml:"max_label_dots"`
+	Server        ServerConfig `toml:"server"`
 }
 
-type Server struct {
+type ServerConfig struct {
 	URL          string   `toml:"url"`           // the command server, e.g. https://ptouch.example.com
 	TokenFile    string   `toml:"token_file"`    // the board's bearer token
 	PollInterval Duration `toml:"poll_interval"` // how often to ask for a job, fixed
@@ -33,22 +33,22 @@ func (d *Duration) UnmarshalText(b []byte) error {
 	return err
 }
 
-func defaults() Config {
+func defaultConfig() Config {
 	return Config{
 		BusyTimeout:   Duration{30 * time.Second},
 		StatusTimeout: Duration{3 * time.Second},
 		PrintTimeout:  Duration{20 * time.Second},
 		MaxLabelDots:  3600, // about 50 cm
-		Server: Server{
-			TokenFile:    "/etc/ptouch-print-server/token",
+		Server: ServerConfig{
+			TokenFile:    "/etc/ptouch-print-board/token",
 			PollInterval: Duration{15 * time.Second},
 		},
 	}
 }
 
-// Load reads the config file at path.
-func Load(path string) (Config, error) {
-	c := defaults()
+// LoadConfig reads the board's TOML config file at path.
+func LoadConfig(path string) (Config, error) {
+	c := defaultConfig()
 	md, err := toml.DecodeFile(path, &c)
 	if err != nil {
 		return Config{}, fmt.Errorf("reading config: %w", err)

@@ -1,5 +1,5 @@
-BIN     := ptouch-print-server
-PKG     := ./cmd/ptouch-print-server
+BIN     := ptouch-print-board
+PKG     := ./cmd/ptouch-print-board
 RELEASE := CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags '-s -w'
 
 .PHONY: all build test arm64 armv7 armv6 clean

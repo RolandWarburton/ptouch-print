@@ -1,8 +1,8 @@
-# ptouch-print-server
+# ptouch-print
 
 Prints labels on a Brother PT-P700 P-touch printer from anywhere. Two binaries:
 
-- **`ptouch-print-server`** runs on a Raspberry Pi Zero W with the printer on USB.
+- **`ptouch-print-board`** runs on a Raspberry Pi Zero W with the printer on USB.
   Every 15 s it asks the command server for a label, prints it and reports back.
   It listens on nothing; all of its traffic is outgoing HTTPS.
 - **`ptouch-command-server`** runs in Docker behind Traefik. It queues labels
@@ -26,7 +26,7 @@ the static tokens, so a token is shown once, when you make it.
 
 | Who | Credential | Server setting | Where the token goes |
 | --- | --- | --- | --- |
-| The board | board token | `PTOUCH_BOARD_TOKEN_SHA256` | `/etc/ptouch-print-server/token` on the board, owner `ptouch`, mode `0600` |
+| The board | board token | `PTOUCH_BOARD_TOKEN_SHA256` | `/etc/ptouch-print-board/token` on the board, owner `ptouch`, mode `0600` |
 | Scripts and other systems | named client token | `PTOUCH_CLIENT_TOKENS` (`name:hash,...`) | the client, as `Authorization: Bearer <token>` |
 | People via claude.ai | Dex sign-in | `MCP_RESOURCE_URL`, `MCP_ALLOWED_EMAILS` | nowhere: claude.ai signs in through Dex |
 
@@ -49,12 +49,12 @@ the server (`docker compose up -d`).
   board and restart it:
 
   ```sh
-  ssh -t <pi> "echo '<token>' | sudo tee /etc/ptouch-print-server/token >/dev/null \
-    && sudo systemctl restart ptouch-print-server"
+  ssh -t <pi> "echo '<token>' | sudo tee /etc/ptouch-print-board/token >/dev/null \
+    && sudo systemctl restart ptouch-print-board"
   ```
 
   `tee` keeps the file's owner (`ptouch`) and mode (`0600`), which `setup-pi.sh`
-  set when it created it. Check with `sudo ls -l /etc/ptouch-print-server/token`.
+  set when it created it. Check with `sudo ls -l /etc/ptouch-print-board/token`.
 
 Client tokens work on `/api` and `/mcp`. The board token works only on `/board`.
 
@@ -89,15 +89,15 @@ claude.ai. Without Dex, MCP clients can use a client token.
    ```sh
    make armv6
    ssh <pi> 'mkdir -p ~/ptouch'
-   scp bin/ptouch-print-server-linux-armv6 <pi>:ptouch/ptouch-print-server
-   scp deploy/* <pi>:ptouch/
+   scp bin/ptouch-print-board-linux-armv6 <pi>:ptouch/ptouch-print-board
+   scp deploy/board/* <pi>:ptouch/
    ssh -t <pi> 'cd ~/ptouch && sudo sh setup-pi.sh'
    ```
 
-4. **Configure:** set `url` in `/etc/ptouch-print-server/config.toml` (see
-   [deploy/config.example.toml](deploy/config.example.toml)), and write the board
-   token into `/etc/ptouch-print-server/token` as shown under
-   [Tokens](#tokens). Then `sudo systemctl restart ptouch-print-server`.
+4. **Configure:** set `url` in `/etc/ptouch-print-board/config.toml` (see
+   [deploy/board/config.example.toml](deploy/board/config.example.toml)), and
+   write the board token into `/etc/ptouch-print-board/token` as shown under
+   [Tokens](#tokens). Then `sudo systemctl restart ptouch-print-board`.
 
 `setup-pi.sh` is also how you upgrade: copy over the new binary and run it again.
 It creates the `ptouch` user, installs the binary, the config (if missing), an
@@ -112,7 +112,7 @@ On the Pi:
 
   ```sh
   lsusb | grep 04f9:2061
-  journalctl -u ptouch-print-server -f
+  journalctl -u ptouch-print-board -f
   ```
 
   Then `GET /api/status` on the server should say `"online": true` with the
@@ -143,9 +143,9 @@ the printer before printing it again. For a PNG, get the height from
 ```sh
 make test     # vet and unit tests
 make build    # both binaries for this machine, in bin/
-make armv6    # bin/ptouch-print-server-linux-armv6 (Pi Zero / Zero W, Pi 1)
-make armv7    # bin/ptouch-print-server-linux-armv7
-make arm64    # bin/ptouch-print-server-linux-arm64
+make armv6    # bin/ptouch-print-board-linux-armv6 (Pi Zero / Zero W, Pi 1)
+make armv7    # bin/ptouch-print-board-linux-armv7
+make arm64    # bin/ptouch-print-board-linux-arm64
 ```
 
 Both binaries are pure Go (no cgo). The command server's image is built by the

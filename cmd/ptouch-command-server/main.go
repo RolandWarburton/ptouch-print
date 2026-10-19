@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/server"
-	"github.com/RolandWarburton/ptouch-print-server/internal/store"
+	"github.com/RolandWarburton/ptouch-print/internal/server"
+	"github.com/RolandWarburton/ptouch-print/internal/store"
 )
 
 const usage = `ptouch-command-server queues labels for the board to print, taking them over REST and MCP.
@@ -138,7 +138,7 @@ func token(args []string) {
 	}
 	tok, hash := server.NewToken()
 	if *client == "" {
-		fmt.Printf("Board token (put it in /etc/ptouch-print-server/token on the board, mode 0600):\n  %s\n\n", tok)
+		fmt.Printf("Board token (put it in /etc/ptouch-print-board/token on the board, mode 0600):\n  %s\n\n", tok)
 		fmt.Printf("Server setting:\n  PTOUCH_BOARD_TOKEN_SHA256=%s\n", hash)
 		return
 	}

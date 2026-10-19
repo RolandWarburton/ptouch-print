@@ -1,4 +1,4 @@
-module github.com/RolandWarburton/ptouch-print-server
+module github.com/RolandWarburton/ptouch-print
 
 go 1.26.1
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 const mcpVersion = "0.1.0"

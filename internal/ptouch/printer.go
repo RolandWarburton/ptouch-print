@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 // Device is an open connection to the printer, normally /dev/usb/lpN.

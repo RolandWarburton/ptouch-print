@@ -9,7 +9,7 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 const (

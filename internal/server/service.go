@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/store"
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/store"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 const (

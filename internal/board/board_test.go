@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/ptouch"
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/ptouch"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 var tape24, _ = wire.Tape(24)

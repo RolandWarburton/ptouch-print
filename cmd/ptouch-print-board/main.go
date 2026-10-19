@@ -1,4 +1,4 @@
-// Command ptouch-print-server runs on the board: it polls the command server
+// Command ptouch-print-board runs on the board: it polls the command server
 // for labels and prints them on a Brother PT-P700.
 package main
 
@@ -14,18 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/board"
-	"github.com/RolandWarburton/ptouch-print-server/internal/config"
-	"github.com/RolandWarburton/ptouch-print-server/internal/ptouch"
+	"github.com/RolandWarburton/ptouch-print/internal/board"
+	"github.com/RolandWarburton/ptouch-print/internal/ptouch"
 )
 
 func main() {
-	configPath := flag.String("config", "/etc/ptouch-print-server/config.toml", "path to the config file")
+	configPath := flag.String("config", "/etc/ptouch-print-board/config.toml", "path to the config file")
 	flag.Usage = func() {
-		fmt.Fprint(flag.CommandLine.Output(), "ptouch-print-server runs on the board: it polls the command server for labels and\n"+
+		fmt.Fprint(flag.CommandLine.Output(), "ptouch-print-board runs on the board: it polls the command server for labels and\n"+
 			"prints them on a Brother PT-P700. The server URL, token file and poll interval are in\n"+
-			"the config file (see deploy/config.example.toml).\n\n"+
-			"Usage: ptouch-print-server [-config PATH]\n\n")
+			"the config file (see deploy/board/config.example.toml).\n\n"+
+			"Usage: ptouch-print-board [-config PATH]\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -35,7 +34,7 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := board.LoadConfig(*configPath)
 	if err != nil {
 		log.Error("loading config", "err", err)
 		os.Exit(1)

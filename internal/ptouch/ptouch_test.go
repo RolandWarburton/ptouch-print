@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 // fakeDevice plays back status replies. Like usblp, it returns EOF once before

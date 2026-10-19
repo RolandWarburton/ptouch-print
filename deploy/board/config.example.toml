@@ -1,4 +1,4 @@
-# ptouch-print-server config. Copy to /etc/ptouch-print-server/config.toml.
+# ptouch-print-board config. Copy to /etc/ptouch-print-board/config.toml.
 
 # How long a job waits for the printer to finish another one.
 busy_timeout = "30s"
@@ -17,7 +17,7 @@ max_label_dots = 3600
 url = "https://ptouch.example.com"
 
 # The board's token, from `ptouch-command-server token`. Mode 0600, owned by ptouch.
-token_file = "/etc/ptouch-print-server/token"
+token_file = "/etc/ptouch-print-board/token"
 
 # How often to ask for a label. Fixed: the board waits this long after an error too.
 poll_interval = "15s"

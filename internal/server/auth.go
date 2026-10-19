@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/dexauth"
+	"github.com/RolandWarburton/ptouch-print/internal/dexauth"
 )
 
 // Who may call what:

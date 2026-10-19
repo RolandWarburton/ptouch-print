@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 func open(t *testing.T) *Store {

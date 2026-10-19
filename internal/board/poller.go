@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 // Poller asks the command server for a job every Interval, prints it and

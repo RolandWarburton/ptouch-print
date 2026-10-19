@@ -4,7 +4,7 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/ptouch-print-server -config /etc/ptouch-print-server/config.toml
+ExecStart=/usr/local/bin/ptouch-print-board -config /etc/ptouch-print-board/config.toml
 User=ptouch
 Group=ptouch
 # /dev/usb/lpN belongs to the lp group.

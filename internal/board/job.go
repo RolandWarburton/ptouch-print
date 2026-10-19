@@ -11,9 +11,9 @@ import (
 	"image/png"
 	"io"
 
-	"github.com/RolandWarburton/ptouch-print-server/internal/label"
-	"github.com/RolandWarburton/ptouch-print-server/internal/ptouch"
-	"github.com/RolandWarburton/ptouch-print-server/internal/wire"
+	"github.com/RolandWarburton/ptouch-print/internal/label"
+	"github.com/RolandWarburton/ptouch-print/internal/ptouch"
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 const maxImageWidth = 20000 // decoding limit; the printer enforces max_label_dots
