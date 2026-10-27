@@ -100,11 +100,6 @@
             <span class="wc-status" id="print-status" role="status"></span>
           </div>
         </form>
-
-        <section class="wc-card">
-          <div class="wc-head flush"><h3>Each label prints once</h3></div>
-          <p class="muted measure">A failed label is never printed again by itself. If a job fails or stays at Printing, check the printer before you print it again: the label may already have come out.</p>
-        </section>
       </div>
 
       <div id="job-pane" hidden>
@@ -120,6 +115,9 @@
           <div class="why" id="job-why" hidden>
             <span class="wc-label">Why</span>
             <p id="job-why-text"></p>
+          </div>
+          <div class="preview" id="job-preview" hidden>
+            <div class="barcode" role="img" id="job-barcode"></div>
           </div>
           <dl class="wc-facts" id="job-facts"></dl>
         </section>

@@ -9,7 +9,7 @@ allowing for one-way communication.
 It supports 12 mm and 24 mm tape. Text, Barcodes, and PNGs.
 
 ```
-  claude.ai                scripts, curl
+  MCP client               scripts, curl
   (signs in via Dex)       (client token)
       │ MCP /mcp                │ REST /api
       └───────────┬─────────────┘
