@@ -22,7 +22,7 @@ import (
 )
 
 // The web UI (WEB_UI): the static page under web/, and sign-in through Dex
-// for people in a browser. A signed-in browser holds a session cookie that
+// for people in a browser; / sends anyone not signed in straight to Dex. A signed-in browser holds a session cookie that
 // /api/* accepts in place of a bearer token. The cookie names an allowed email
 // and is signed with a key made at startup, so a restart signs everyone out.
 
@@ -61,7 +61,13 @@ func newWebUI(dex *dexAuth, secret string) (*webUI, error) {
 func (u *webUI) routes(mux *http.ServeMux) {
 	root, _ := fs.Sub(webFiles, "web")
 	files := http.FileServerFS(root)
-	mux.Handle("GET /{$}", files)
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := u.session(r); !ok {
+			http.Redirect(w, r, "/auth/login", http.StatusFound)
+			return
+		}
+		files.ServeHTTP(w, r)
+	})
 	mux.Handle("GET /static/", files)
 	mux.HandleFunc("GET /auth/login", u.login)
 	mux.HandleFunc("GET /auth/callback", u.callback)
@@ -70,8 +76,8 @@ func (u *webUI) routes(mux *http.ServeMux) {
 }
 
 // orSession serves a request with no Authorization header but a valid session
-// as the signed-in email; everything else goes to bearer. With SameSite=Strict
-// on the cookie and JSON required on writes, another site can't submit for you.
+// as the signed-in email; everything else goes to bearer. With SameSite=Lax on
+// the cookie and JSON required on writes, another site can't submit for you.
 func (u *webUI) orSession(bearer, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		email, ok := u.session(r)
@@ -154,7 +160,9 @@ func (u *webUI) callback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, email+" is not allowed to print.", http.StatusForbidden)
 		return
 	}
-	u.setCookie(w, sessionCookie, "/", u.seal(email, sessionLife), sessionLife, http.SameSiteStrictMode)
+	// Lax, not Strict: the redirect to / follows Dex's, so the browser counts it
+	// as cross-site, and a Strict cookie would be left off and send you back to Dex.
+	u.setCookie(w, sessionCookie, "/", u.seal(email, sessionLife), sessionLife, http.SameSiteLaxMode)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -188,7 +196,7 @@ func (u *webUI) exchange(ctx context.Context, code, verifier string) (string, er
 }
 
 func (u *webUI) logout(w http.ResponseWriter, _ *http.Request) {
-	u.setCookie(w, sessionCookie, "/", "", -1, http.SameSiteStrictMode)
+	u.setCookie(w, sessionCookie, "/", "", -1, http.SameSiteLaxMode)
 	w.WriteHeader(http.StatusNoContent)
 }
 

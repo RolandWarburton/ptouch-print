@@ -110,8 +110,8 @@ func TestWebSignIn(t *testing.T) {
 	e := newWebEnv(t, dex)
 	e.poll("24")
 
-	if res := send(t, "GET", e.url+"/", "", ""); res.StatusCode != 200 || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/html") {
-		t.Fatalf("page: %d %s", res.StatusCode, res.Header.Get("Content-Type"))
+	if res := send(t, "GET", e.url+"/", "", ""); res.StatusCode != 302 || res.Header.Get("Location") != "/auth/login" {
+		t.Fatalf("page before sign-in: %d %q", res.StatusCode, res.Header.Get("Location"))
 	}
 	if res := send(t, "GET", e.url+"/static/app.js", "", ""); res.StatusCode != 200 {
 		t.Fatalf("app.js: %d", res.StatusCode)
@@ -122,9 +122,12 @@ func TestWebSignIn(t *testing.T) {
 
 	res := signIn(t, e, dex, "mine")
 	session := cookie(res, sessionCookie)
-	if res.StatusCode != http.StatusSeeOther || session == nil || session.SameSite != http.SameSiteStrictMode ||
+	if res.StatusCode != http.StatusSeeOther || session == nil || session.SameSite != http.SameSiteLaxMode ||
 		!session.Secure || !session.HttpOnly || session.Path != "/" {
 		t.Fatalf("callback: %d %+v", res.StatusCode, session)
+	}
+	if res := send(t, "GET", e.url+"/", "", "", session); res.StatusCode != 200 || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/html") {
+		t.Fatalf("page: %d %s", res.StatusCode, res.Header.Get("Content-Type"))
 	}
 	if res := send(t, "GET", e.url+"/auth/me", "", "", session); res.StatusCode != 200 {
 		t.Fatalf("me: %d", res.StatusCode)
