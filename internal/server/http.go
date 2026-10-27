@@ -18,6 +18,8 @@ type Options struct {
 	BoardTokenHash string
 	ClientTokens   Tokens
 	Dex            *DexConfig // nil: no Dex, client tokens only
+	WebUI          bool       // serve the web UI; needs Dex, which signs people in
+	WebSecret      string     // the Dex client ptouch-web's secret
 }
 
 // NewHandler serves every route:
@@ -30,6 +32,9 @@ type Options struct {
 //	GET  /api/jobs[?limit=N], /api/jobs/{id}           client: newest jobs, one job
 //	GET  /api/status                                   client: is the board online, which tape
 //	POST /mcp                                          client: MCP Streamable HTTP, stateless
+//
+// With WebUI, also the page at / and /static/, and sign-in at /auth/*; /api/*
+// then accepts a signed-in browser's session cookie too.
 func NewHandler(svc *Service, opts Options, log *slog.Logger) (http.Handler, error) {
 	if !validHash(opts.BoardTokenHash) {
 		return nil, errors.New("the board token hash must be 64 hex characters (see ptouch-command-server token)")
@@ -52,19 +57,36 @@ func NewHandler(svc *Service, opts Options, log *slog.Logger) (http.Handler, err
 	if len(opts.ClientTokens) == 0 && opts.Dex == nil {
 		log.Warn("no client tokens and no Dex: nobody can submit jobs")
 	}
+	var web *webUI
+	if opts.WebUI {
+		if client.dex == nil {
+			return nil, errors.New("WEB_UI needs Dex to sign people in: set MCP_RESOURCE_URL, MCP_OIDC_ISSUER and MCP_ALLOWED_EMAILS")
+		}
+		var err error
+		if web, err = newWebUI(client.dex, opts.WebSecret); err != nil {
+			return nil, err
+		}
+		web.routes(mux)
+	}
 	h := handlers{svc}
 	boardOnly := func(f http.HandlerFunc) http.Handler { return requireAuth(board, nil, f) }
 	clientOnly := func(f http.Handler) http.Handler { return requireAuth(client, challenge, f) }
+	api := func(f http.HandlerFunc) http.Handler {
+		if web == nil {
+			return clientOnly(f)
+		}
+		return web.orSession(clientOnly(f), f)
+	}
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	})
 	mux.Handle("GET "+wire.NextPath, boardOnly(h.next))
 	mux.Handle("POST /board/jobs/{id}/result", boardOnly(h.result))
-	mux.Handle("POST /api/jobs", clientOnly(http.HandlerFunc(h.submit)))
-	mux.Handle("GET /api/jobs", clientOnly(http.HandlerFunc(h.list)))
-	mux.Handle("GET /api/jobs/{id}", clientOnly(http.HandlerFunc(h.get)))
-	mux.Handle("GET /api/status", clientOnly(http.HandlerFunc(h.status)))
+	mux.Handle("POST /api/jobs", api(h.submit))
+	mux.Handle("GET /api/jobs", api(h.list))
+	mux.Handle("GET /api/jobs/{id}", api(h.get))
+	mux.Handle("GET /api/status", api(h.status))
 	mcpServer := NewMCP(svc)
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer },
 		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})

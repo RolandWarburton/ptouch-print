@@ -9,6 +9,7 @@
 #   /board/*   the board (board token)
 #   /api/*     REST clients (named client tokens, or Dex)
 #   /mcp       claude.ai (Dex client ptouch-mcp) or a client token
+#   /, /auth/* the web UI, when WEB_UI is true (Dex client ptouch-web)
 
 name: ptouch
 
@@ -21,6 +22,7 @@ services:
       - .env
     environment:
       GOMEMLIMIT: 48MiB
+      WEB_UI: ${WEB_UI:-false}
     volumes:
       - jobs:/data
     read_only: true

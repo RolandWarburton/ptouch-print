@@ -34,6 +34,12 @@ type env struct {
 
 func newEnv(t *testing.T, dex *DexConfig) *env {
 	t.Helper()
+	return newEnvWith(t, Options{Dex: dex})
+}
+
+// newEnvWith is newEnv with more options; the tokens are always the test ones.
+func newEnvWith(t *testing.T, opts Options) *env {
+	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "jobs.sqlite"))
 	if err != nil {
 		t.Fatal(err)
@@ -42,11 +48,8 @@ func newEnv(t *testing.T, dex *DexConfig) *env {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	e := &env{t: t, svc: NewService(st, log), now: time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)}
 	e.svc.now = func() time.Time { return e.now }
-	h, err := NewHandler(e.svc, Options{
-		BoardTokenHash: HashToken(boardToken),
-		ClientTokens:   Tokens{HashToken(clientToken): "ci"},
-		Dex:            dex,
-	}, log)
+	opts.BoardTokenHash, opts.ClientTokens = HashToken(boardToken), Tokens{HashToken(clientToken): "ci"}
+	h, err := NewHandler(e.svc, opts, log)
 	if err != nil {
 		t.Fatal(err)
 	}

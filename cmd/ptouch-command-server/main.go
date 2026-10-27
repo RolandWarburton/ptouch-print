@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -37,6 +38,10 @@ Serving is configured from the environment:
   MCP_RESOURCE_URL           public URL of /mcp, e.g. https://ptouch.example.com/mcp
   MCP_ALLOWED_EMAILS         comma-separated emails who may print
   MCP_OIDC_AUDIENCE          the Dex client (default ptouch-mcp)
+
+  The web UI at /, off unless WEB_UI is true. People sign in through Dex, so it needs Dex set up:
+  WEB_UI                     true to serve it
+  PTOUCH_WEB_OIDC_SECRET     the secret of Dex client ptouch-web (required with WEB_UI)
 
 Flags for serving:
 `
@@ -93,6 +98,12 @@ func serve(log *slog.Logger, addr, dbPath string) error {
 			Allowed:     os.Getenv("MCP_ALLOWED_EMAILS"),
 		}
 	}
+	if s := os.Getenv("WEB_UI"); s != "" {
+		if opts.WebUI, err = strconv.ParseBool(s); err != nil {
+			return fmt.Errorf("WEB_UI must be true or false: %w", err)
+		}
+	}
+	opts.WebSecret = os.Getenv("PTOUCH_WEB_OIDC_SECRET")
 
 	st, err := store.Open(dbPath)
 	if err != nil {
@@ -115,7 +126,7 @@ func serve(log *slog.Logger, addr, dbPath string) error {
 		defer cancel()
 		srv.Shutdown(shutdown)
 	}()
-	log.Info("serving", "addr", addr, "db", dbPath, "client_tokens", len(opts.ClientTokens), "dex", opts.Dex != nil)
+	log.Info("serving", "addr", addr, "db", dbPath, "client_tokens", len(opts.ClientTokens), "dex", opts.Dex != nil, "web_ui", opts.WebUI)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
