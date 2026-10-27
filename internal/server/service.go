@@ -194,6 +194,7 @@ type BoardStatus struct {
 	TapeMM     int        `json:"tape_mm"`
 	HeightDots int        `json:"height_dots,omitempty"` // the image height the tape needs
 	Problem    string     `json:"problem,omitempty"`     // why it can't print, e.g. editor_lite
+	Fix        string     `json:"fix,omitempty"`         // how to fix Problem, for people
 }
 
 func (s *Service) Status() BoardStatus {
@@ -206,6 +207,9 @@ func (s *Service) Status() BoardStatus {
 	st := BoardStatus{Online: s.now().Sub(last) <= OfflineAfter, LastPoll: &last}
 	if st.Online {
 		st.TapeMM, st.Problem = tape, problem
+		if problem != "" {
+			st.Fix = notReady(problem).Msg
+		}
 		if t, ok := wire.Tape(tape); ok {
 			st.HeightDots = t.Dots
 		}

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ptouch</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/bundle.css">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="wc page">
+  <header class="wc-top">
+    <div class="wc-brand">
+      <h1 class="wc-brand-name"><a href="#">ptouch</a></h1>
+      <span class="wc-brand-sub">label printer</span>
+    </div>
+    <div class="wc-who" id="who" hidden>
+      <span class="wc-email" id="email"></span>
+      <button type="button" class="wc-btn" id="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <section class="wc-empty" id="sign-in" hidden>
+    <div>
+      <h2>Sign in to print labels</h2>
+      <p>Sign in with Dex to see the printer and its labels.</p>
+    </div>
+    <p><a class="wc-btn wc-btn-primary" href="/auth/login">Sign in</a></p>
+  </section>
+
+  <div class="wc-app" id="app" hidden>
+    <section class="wc-pane-list stack-24">
+      <section class="wc-card" aria-labelledby="printer-h">
+        <div class="wc-head">
+          <h3 id="printer-h">Printer</h3>
+          <span class="wc-state" id="printer-state"></span>
+        </div>
+        <div class="fix" id="printer-fix" hidden></div>
+        <dl class="wc-facts facts-3">
+          <div class="wc-fact"><dt>Tape</dt><dd id="tape"></dd></div>
+          <div class="wc-fact"><dt>Label height</dt><dd id="height"></dd></div>
+          <div class="wc-fact"><dt>Checked in</dt><dd><time id="checked"></time></dd></div>
+        </dl>
+      </section>
+
+      <div>
+        <div class="wc-bar"><h2>Labels</h2><span class="wc-count" id="count"></span></div>
+        <div class="filters">
+          <span class="wc-seg" role="group" aria-label="Show" id="filter">
+            <button type="button" aria-pressed="true" data-filter="all">All</button>
+            <button type="button" aria-pressed="false" data-filter="done">Printed</button>
+            <button type="button" aria-pressed="false" data-filter="failed">Failed</button>
+            <button type="button" aria-pressed="false" data-filter="waiting">Waiting</button>
+          </span>
+        </div>
+        <ul class="wc-rows" id="rows"></ul>
+        <p class="wc-none" id="no-rows" hidden>No labels here.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="stack" id="print-pane">
+        <form class="wc-card wc-hero" id="print-form" novalidate>
+          <div class="wc-title-row"><h2 class="wc-title">Print a label</h2></div>
+          <span class="wc-seg" role="group" aria-label="Label kind" id="kind">
+            <button type="button" aria-pressed="true" data-kind="barcode">Barcode</button>
+            <button type="button" aria-pressed="false" data-kind="image">Image</button>
+          </span>
+
+          <div class="stack-12" id="barcode-fields">
+            <div>
+              <label class="wc-label" for="text">Barcode text</label>
+              <input class="wc-input mono" id="text" maxlength="80" autocomplete="off" spellcheck="false">
+              <p class="hint" id="text-hint">Code 128, up to 80 characters.</p>
+            </div>
+            <div>
+              <span class="wc-label" id="preview-label">Preview</span>
+              <div class="preview">
+                <div class="barcode" role="img" id="barcode" aria-label="Barcode preview"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack-12" id="image-fields" hidden>
+            <div>
+              <label class="wc-label" for="png">PNG image</label>
+              <input class="wc-input" id="png" type="file" accept="image/png">
+              <p class="hint" id="png-hint"></p>
+            </div>
+            <div class="preview">
+              <img id="png-preview" alt="The chosen image" hidden>
+              <p class="muted" id="png-none">The image appears here once you choose a file.</p>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="wc-btn wc-btn-primary" id="print">Print label</button>
+            <span class="wc-status" id="print-status" role="status"></span>
+          </div>
+        </form>
+
+        <section class="wc-card">
+          <div class="wc-head flush"><h3>Each label prints once</h3></div>
+          <p class="muted measure">A failed label is never printed again by itself. If a job fails or stays at Printing, check the printer before you print it again: the label may already have come out.</p>
+        </section>
+      </div>
+
+      <div id="job-pane" hidden>
+        <div class="wc-call-top">
+          <a class="wc-btn" href="#"><span class="wc-back-narrow">← All labels</span><span class="wc-back-wide">Close</span></a>
+        </div>
+        <section class="wc-card wc-hero">
+          <div class="wc-title-row">
+            <h2 class="wc-title" id="job-title"></h2>
+            <span class="wc-state" id="job-state"></span>
+          </div>
+          <span class="wc-hero-ago"><time id="job-ago"></time></span>
+          <div class="why" id="job-why" hidden>
+            <span class="wc-label">Why</span>
+            <p id="job-why-text"></p>
+          </div>
+          <dl class="wc-facts" id="job-facts"></dl>
+        </section>
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>
