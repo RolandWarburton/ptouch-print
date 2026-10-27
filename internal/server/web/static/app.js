@@ -90,10 +90,9 @@ function jobTag(job) {
 }
 
 function mayHavePrinted(job) {
-  if (job.status === 'done') return 'Yes, it printed';
-  if (job.status === 'sent') return 'Maybe';
-  if (job.status === 'failed') return job.result && job.result.may_have_printed ? 'Maybe' : 'No';
-  return 'No';
+  if (job.status === 'done' || job.status === 'sent') return 'true';
+  if (job.status === 'failed') return job.result && job.result.may_have_printed ? 'true' : 'false';
+  return 'false';
 }
 
 const FILTERS = {
@@ -266,6 +265,13 @@ function renderPane() {
   if (job.status === 'queued') why = 'Waiting for the board to take it. It checks in every 15 seconds.';
   $('job-why').hidden = !why;
   $('job-why-text').textContent = why;
+
+  const bits = job.kind === 'barcode' && code128(job.text);
+  $('job-preview').hidden = !bits;
+  if (bits) {
+    $('job-barcode').setAttribute('aria-label', `Barcode preview for ${job.text}`);
+    $('job-barcode').replaceChildren(barsSVG(bits), el('span', '', job.text));
+  }
 
   const facts = [];
   if (job.result && job.result.code) facts.push(['Code', job.result.code]);
