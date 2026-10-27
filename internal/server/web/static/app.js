@@ -112,7 +112,17 @@ function el(tag, cls, text) {
   return e;
 }
 
+// showSignIn sends the browser to Dex's sign-in page. If it was sent there in
+// the last minute and still isn't signed in, the cookie isn't sticking, so it
+// shows a sign-in link instead of going round again.
 function showSignIn() {
+  let last = 0;
+  try { last = Number(sessionStorage.getItem('signInAt')) || 0; } catch {}
+  if (Date.now() - last > 60000) {
+    try { sessionStorage.setItem('signInAt', String(Date.now())); } catch {}
+    location.assign('/auth/login');
+    return;
+  }
   $('app').hidden = true;
   $('who').hidden = true;
   $('sign-in').hidden = false;
