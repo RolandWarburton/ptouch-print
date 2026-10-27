@@ -8,6 +8,8 @@ import (
 	"encoding/binary"
 	"image"
 	"image/color"
+
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 const (
@@ -15,25 +17,6 @@ const (
 	HeadPins  = 128 // print head height in dots
 	lineBytes = HeadPins / 8
 )
-
-// TapeSpec is the printable area of one tape width.
-type TapeSpec struct {
-	MM       int
-	Dots     int  // printable height in dots, across the tape
-	Margin   int  // unused pins before the printable area
-	Verified bool // geometry confirmed by printing on real tape
-}
-
-var tapes = map[int]TapeSpec{
-	12: {MM: 12, Dots: 70, Margin: 29},
-	24: {MM: 24, Dots: 128, Margin: 0, Verified: true},
-}
-
-// Tape returns the geometry for a supported tape width.
-func Tape(mm int) (TapeSpec, bool) {
-	t, ok := tapes[mm]
-	return t, ok
-}
 
 // statusRequest invalidates any half-received job, initialises the printer
 // and asks for its status.
@@ -45,7 +28,7 @@ func statusRequest() []byte {
 // width is the label length. Each image column is one raster line. It sends
 // only the setup commands the PT-P700 needs; the extra ones from Brother's
 // newer-model reference make it reject the job.
-func encodeJob(img image.Image, t TapeSpec, mediaType byte) []byte {
+func encodeJob(img image.Image, t wire.TapeSpec, mediaType byte) []byte {
 	b := img.Bounds()
 	lines := b.Dx()
 

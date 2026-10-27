@@ -7,6 +7,8 @@ import (
 	"image"
 	"io"
 	"time"
+
+	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
 // Device is an open connection to the printer, normally /dev/usb/lpN.
@@ -58,10 +60,10 @@ func (e *LabelTooLongError) Error() string {
 }
 
 // RenderFunc draws the label for the loaded tape.
-type RenderFunc func(TapeSpec) (image.Image, error)
+type RenderFunc func(wire.TapeSpec) (image.Image, error)
 
 type Result struct {
-	Tape       TapeSpec
+	Tape       wire.TapeSpec
 	LengthDots int
 }
 
@@ -128,7 +130,7 @@ func (p *Printer) Print(ctx context.Context, wantMM int, render RenderFunc) (Res
 	if len(st.Errors) > 0 {
 		return Result{}, &PrinterError{Errors: st.Errors, E1: st.e1, E2: st.e2}
 	}
-	t, ok := Tape(st.TapeMM)
+	t, ok := wire.Tape(st.TapeMM)
 	if !ok {
 		return Result{}, &UnsupportedTapeError{MM: st.TapeMM}
 	}

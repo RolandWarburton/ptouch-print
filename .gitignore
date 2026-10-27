@@ -1,12 +1,9 @@
 bin/
-web/dist/
 
-# Secrets: never commit. The server writes its API key to /var/lib on the Pi;
-# these are local copies.
+# Secrets: never commit. The server's real .env lives on its host.
 .env
 .env.*
 !.env.example
-/api-key
 
 # Local agent instructions.
 CLAUDE.md

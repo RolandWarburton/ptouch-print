@@ -1,0 +1,23 @@
+[Unit]
+Description=Brother P-touch print board (polls the command server)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/ptouch-print-board -config /etc/ptouch-print-board/config.toml
+User=ptouch
+Group=ptouch
+# /dev/usb/lpN belongs to the lp group.
+SupplementaryGroups=lp
+# A job already taken from the server is finished before stopping (at most ~55 s).
+TimeoutStopSec=90
+Restart=always
+RestartSec=15
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

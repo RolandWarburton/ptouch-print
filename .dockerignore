@@ -1,0 +1,6 @@
+# Allowlist: send the build only what the Dockerfile copies.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
