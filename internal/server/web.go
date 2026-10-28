@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/image/font/gofont/gobold"
+
 	"github.com/RolandWarburton/ptouch-print/internal/dexauth"
 )
 
@@ -69,6 +71,11 @@ func (u *webUI) routes(mux *http.ServeMux) {
 		files.ServeHTTP(w, r)
 	})
 	mux.Handle("GET /static/", files)
+	// Text labels are drawn in the browser with the font the board's barcodes use.
+	mux.HandleFunc("GET /static/gobold.ttf", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "font/ttf")
+		w.Write(gobold.TTF)
+	})
 	mux.HandleFunc("GET /auth/login", u.login)
 	mux.HandleFunc("GET /auth/callback", u.callback)
 	mux.HandleFunc("POST /auth/logout", u.logout)

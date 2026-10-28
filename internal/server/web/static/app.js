@@ -15,6 +15,11 @@ const state = {
   filter: 'all',
   kind: 'barcode',
   extra: null, // the open job when it isn't among the newest
+  size: 1, // a text label's size, as a fraction of the largest that fits
+  align: 'center',
+  glyph: null, // code point -> whether Go Bold can draw it, once the font loads
+  fontFailed: false,
+  textError: '', // why the text label can't print yet, or ''
 };
 
 // --- API -------------------------------------------------------------------
@@ -146,12 +151,14 @@ function renderPrinter() {
   const st = state.status || {};
   let tag = 'Ready';
   let fix = '';
+  let hot = false;
   if (!st.last_poll) {
     tag = 'Offline';
     fix = 'The board has never checked in. Check that it is powered and on the network.';
   } else if (!st.online) {
     tag = 'Offline';
-    fix = 'The board has stopped checking in. Check that it is powered and on the network.';
+    fix = 'Printer offline';
+    hot = true;
   } else if (st.problem) {
     tag = st.problem.replace(/_/g, ' ');
     fix = st.fix || '';
@@ -162,6 +169,7 @@ function renderPrinter() {
   $('printer-state').textContent = tag;
   $('printer-fix').textContent = fix;
   $('printer-fix').hidden = !fix;
+  $('printer-fix').classList.toggle('is-hot', hot);
   $('tape').textContent = st.online && st.tape_mm ? `${st.tape_mm} mm` : 'None reported';
   $('height').textContent = st.online && st.height_dots ? `${st.height_dots} dots` : '—';
   if (st.last_poll) setTime($('checked'), st.last_poll);
@@ -309,20 +317,151 @@ async function loadExtra(id) {
 
 // --- The print form --------------------------------------------------------
 
-function renderForm() {
-  const barcode = state.kind === 'barcode';
-  for (const b of $('kind').querySelectorAll('button')) {
-    b.setAttribute('aria-pressed', String(b.dataset.kind === state.kind));
+function pressed(group, key) {
+  for (const b of $(group).querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', String(b.dataset[key] === String(state[key])));
   }
-  $('barcode-fields').hidden = !barcode;
-  $('image-fields').hidden = barcode;
+}
+
+function renderForm() {
+  pressed('kind', 'kind');
+  $('barcode-fields').hidden = state.kind !== 'barcode';
+  $('text-fields').hidden = state.kind !== 'text';
+  $('image-fields').hidden = state.kind !== 'image';
   $('print').disabled = !ready();
 
   const st = state.status || {};
-  $('preview-label').textContent = st.online && st.tape_mm ? `Preview, ${st.tape_mm} mm tape` : 'Preview';
+  const preview = st.online && st.tape_mm ? `Preview, ${st.tape_mm} mm tape` : 'Preview';
+  $('preview-label').textContent = preview;
+  $('text-preview-label').textContent = preview;
   $('png-hint').textContent = st.online && st.height_dots
     ? `Must be ${st.height_dots} dots high for the ${st.tape_mm} mm tape that is loaded. Up to 1 MB.`
     : 'Must be as many dots high as the loaded tape needs. Up to 1 MB.';
+
+  // Only 24 mm tape takes a second line.
+  const oneLine = !!st.tape_mm && st.tape_mm !== 24;
+  if (oneLine) $('line2').value = '';
+  $('line2-field').hidden = oneLine;
+  drawText();
+}
+
+// --- Text labels -----------------------------------------------------------
+
+// The board prints at 180 dpi. A text label is padded 14 dots at each end and
+// may be 15 cm long, padding included.
+const DOTS_PER_CM = 180 / 2.54;
+const TEXT_PAD = 14;
+const MAX_TEXT_DOTS = Math.round(15 * DOTS_PER_CM);
+const LINE_GAP = 0.1; // between two lines, as a fraction of a line's height
+
+// cmapLookup reads the font's Windows Unicode cmap (format 4, which Go Bold
+// has) and returns whether a code point has a glyph.
+function cmapLookup(buf) {
+  const v = new DataView(buf);
+  let cmap = 0;
+  for (let i = 0; i < v.getUint16(4); i++) {
+    if (v.getUint32(12 + 16 * i) === 0x636d6170) cmap = v.getUint32(12 + 16 * i + 8); // 'cmap'
+  }
+  let sub = 0;
+  for (let i = 0; i < v.getUint16(cmap + 2); i++) {
+    const r = cmap + 4 + 8 * i;
+    if (v.getUint16(r) === 3 && v.getUint16(r + 2) === 1) sub = cmap + v.getUint32(r + 4);
+  }
+  const segs = v.getUint16(sub + 6) / 2;
+  const ends = sub + 14;
+  const starts = ends + 2 * segs + 2;
+  const deltas = starts + 2 * segs;
+  const offsets = deltas + 2 * segs;
+  return (c) => {
+    for (let i = 0; i < segs; i++) {
+      if (c > v.getUint16(ends + 2 * i)) continue;
+      const start = v.getUint16(starts + 2 * i);
+      if (c < start) return false;
+      const ro = v.getUint16(offsets + 2 * i);
+      if (!ro) return ((c + v.getInt16(deltas + 2 * i)) & 0xffff) !== 0;
+      return v.getUint16(offsets + 2 * i + ro + 2 * (c - start)) !== 0;
+    }
+    return false;
+  };
+}
+
+async function loadFont() {
+  try {
+    const res = await fetch('/static/gobold.ttf');
+    if (!res.ok) throw new Error();
+    const buf = await res.arrayBuffer();
+    document.fonts.add(await new FontFace('Go Bold', buf.slice(0)).load());
+    state.glyph = cmapLookup(buf);
+  } catch {
+    state.fontFailed = true;
+  }
+  drawText();
+}
+
+function textLines() {
+  return [$('line1').value, $('line2-field').hidden ? '' : $('line2').value].filter(Boolean);
+}
+
+// drawText draws the text label onto the canvas Print sends, at the loaded
+// tape's height, and sets state.textError when it can't be printed.
+function drawText() {
+  const st = state.status || {};
+  const lines = textLines();
+  pressed('size', 'size');
+  pressed('align', 'align');
+  $('align').hidden = lines.length < 2;
+
+  let none = '';
+  let problem = '';
+  if (state.fontFailed) none = 'Couldn\'t load the Go Bold font. Reload the page to try again.';
+  else if (!state.glyph) none = 'Loading the font…';
+  else if (!st.online || !st.height_dots) none = 'The preview appears once the printer reports its tape.';
+  else if (!lines.length) none = 'Type the text to see the label.';
+  else {
+    const missing = [...new Set(lines.join(''))].filter((ch) => !state.glyph(ch.codePointAt(0)));
+    if (missing.length) problem = `Go Bold can't draw: ${missing.join(' ')}`;
+  }
+
+  const canvas = $('text-canvas');
+  canvas.hidden = !!(none || problem);
+  $('text-none').hidden = !none;
+  $('text-none').textContent = none;
+  state.textError = none || problem;
+  if (none || problem) {
+    $('text-length').textContent = problem;
+    $('text-length').classList.toggle('is-error', !!problem);
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  ctx.font = '100px "Go Bold"';
+  const m = ctx.measureText('Hg');
+  const ascent = m.fontBoundingBoxAscent / 100;
+  const descent = m.fontBoundingBoxDescent / 100;
+  const height = st.height_dots;
+  const lineHeight = (height / (lines.length + (lines.length - 1) * LINE_GAP)) * state.size;
+  const font = `${lineHeight / (ascent + descent)}px "Go Bold"`;
+  ctx.font = font;
+  const widths = lines.map((l) => Math.ceil(ctx.measureText(l).width));
+  const width = Math.max(...widths);
+
+  canvas.width = width + 2 * TEXT_PAD; // resets the context
+  canvas.height = height;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, height);
+  ctx.fillStyle = '#000000';
+  ctx.font = font;
+  const top = (height - lineHeight * (lines.length + (lines.length - 1) * LINE_GAP)) / 2;
+  lines.forEach((l, i) => {
+    const spare = width - widths[i];
+    const x = TEXT_PAD + { left: 0, center: spare / 2, right: spare }[state.align];
+    ctx.fillText(l, x, top + i * lineHeight * (1 + LINE_GAP) + ascent * (lineHeight / (ascent + descent)));
+  });
+
+  const cm = (canvas.width / DOTS_PER_CM).toFixed(1);
+  if (canvas.width > MAX_TEXT_DOTS) state.textError = `The label is ${cm} cm long; the limit is 15 cm.`;
+  $('text-length').textContent = state.textError || `${cm} cm of 15 cm`;
+  $('text-length').classList.toggle('is-error', !!state.textError);
 }
 
 function renderBarcode() {
@@ -432,6 +571,11 @@ async function submit(e) {
       const text = $('text').value;
       if (!text) return say('Type the text for the barcode.', true);
       job = { kind: 'barcode', text };
+    } else if (state.kind === 'text') {
+      drawText();
+      if (state.textError) return say(state.textError, true);
+      const image = $('text-canvas').toDataURL('image/png').split(',')[1];
+      job = { kind: 'image', tape_mm: state.status.tape_mm, image };
     } else {
       const file = $('png').files[0];
       if (!file) return say('Choose a PNG image.', true);
@@ -475,6 +619,16 @@ async function start() {
     renderForm();
   });
   $('text').addEventListener('input', renderBarcode);
+  for (const key of ['size', 'align']) {
+    $(key).addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      state[key] = key === 'size' ? Number(b.dataset.size) : b.dataset.align;
+      drawText();
+    });
+  }
+  $('line1').addEventListener('input', drawText);
+  $('line2').addEventListener('input', drawText);
   $('png').addEventListener('change', showImage);
   $('print-form').addEventListener('submit', submit);
   $('sign-out').addEventListener('click', async () => {
@@ -487,6 +641,7 @@ async function start() {
   });
   document.addEventListener('visibilitychange', poll);
   renderBarcode();
+  loadFont();
 
   try {
     const me = await api('/auth/me');

@@ -66,6 +66,7 @@
           <div class="wc-title-row"><h2 class="wc-title">Print a label</h2></div>
           <span class="wc-seg" role="group" aria-label="Label kind" id="kind">
             <button type="button" aria-pressed="true" data-kind="barcode">Barcode</button>
+            <button type="button" aria-pressed="false" data-kind="text">Text</button>
             <button type="button" aria-pressed="false" data-kind="image">Image</button>
           </span>
 
@@ -80,6 +81,38 @@
               <div class="preview">
                 <div class="barcode" role="img" id="barcode" aria-label="Barcode preview"></div>
               </div>
+            </div>
+          </div>
+
+          <div class="stack-12" id="text-fields" hidden>
+            <div>
+              <label class="wc-label" for="line1">Line 1</label>
+              <input class="wc-input" id="line1" autocomplete="off">
+            </div>
+            <div id="line2-field">
+              <label class="wc-label" for="line2">Line 2</label>
+              <input class="wc-input" id="line2" autocomplete="off">
+              <p class="hint">24 mm tape only.</p>
+            </div>
+            <div class="actions">
+              <span class="wc-seg" role="group" aria-label="Size" id="size">
+                <button type="button" aria-pressed="true" data-size="1">Large</button>
+                <button type="button" aria-pressed="false" data-size="0.75">Medium</button>
+                <button type="button" aria-pressed="false" data-size="0.5">Small</button>
+              </span>
+              <span class="wc-seg" role="group" aria-label="Alignment" id="align" hidden>
+                <button type="button" aria-pressed="false" data-align="left">Left</button>
+                <button type="button" aria-pressed="true" data-align="center">Centre</button>
+                <button type="button" aria-pressed="false" data-align="right">Right</button>
+              </span>
+            </div>
+            <div>
+              <span class="wc-label" id="text-preview-label">Preview</span>
+              <div class="preview">
+                <canvas id="text-canvas" hidden></canvas>
+                <p class="muted" id="text-none"></p>
+              </div>
+              <p class="hint" id="text-length"></p>
             </div>
           </div>
 

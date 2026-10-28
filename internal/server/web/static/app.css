@@ -14,10 +14,11 @@ body { margin: 0; background: var(--bg); }
 .mono { font-family: var(--font-mono); }
 .hint { margin: 6px 0 0; font: 400 12px/1.5 var(--font-mono); color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-12); }
-.wc-status.is-error { color: var(--hot); }
+.wc-status.is-error, .hint.is-error { color: var(--hot); }
 
 /* The printer's problem, and how to fix it */
 .fix { background: var(--inverse); color: var(--on-inverse); padding: 12px 14px; margin-bottom: var(--gap); font-weight: 600; }
+.fix.is-hot { background: var(--hot); color: var(--on-hot); }
 
 .why { background: var(--bg); padding: 12px 14px; }
 .why p { margin: 0; }
@@ -27,7 +28,7 @@ body { margin: 0; background: var(--bg); }
 .barcode { background: #ffffff; padding: 12px 24px 8px; display: grid; justify-items: center; gap: 6px; max-width: 100%; }
 .barcode svg { display: block; height: 72px; max-width: 100%; }
 .barcode span { font: 600 13px/1 var(--font-mono); color: #121212; letter-spacing: 0.08em; overflow-wrap: anywhere; }
-#png-preview { display: block; max-width: 100%; background: #ffffff; image-rendering: pixelated; }
+#png-preview, #text-canvas { display: block; max-width: 100%; background: #ffffff; image-rendering: pixelated; }
 
 .row-image {
   grid-column: 1 / -1;
