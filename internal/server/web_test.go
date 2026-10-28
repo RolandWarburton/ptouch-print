@@ -116,9 +116,6 @@ func TestWebSignIn(t *testing.T) {
 	if res := send(t, "GET", e.url+"/static/app.js", "", ""); res.StatusCode != 200 {
 		t.Fatalf("app.js: %d", res.StatusCode)
 	}
-	if res := send(t, "GET", e.url+"/static/gobold.ttf", "", ""); res.StatusCode != 200 || res.Header.Get("Content-Type") != "font/ttf" {
-		t.Fatalf("gobold.ttf: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
-	}
 	if res := send(t, "GET", e.url+"/auth/me", "", ""); res.StatusCode != 401 {
 		t.Fatalf("me before sign-in: %d", res.StatusCode)
 	}

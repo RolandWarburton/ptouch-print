@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RolandWarburton/ptouch-print/internal/label"
 	"github.com/RolandWarburton/ptouch-print/internal/store"
 	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
@@ -128,6 +129,9 @@ func (s *Service) Submit(ctx context.Context, who string, job wire.Job) (store.J
 			return store.Job{}, refuse(http.StatusBadRequest, "bad_text", "%s", msg)
 		}
 		job = wire.Job{Kind: job.Kind, Text: job.Text}
+	case wire.KindText:
+		// Checked below, once the loaded tape is known.
+		job = wire.Job{Kind: job.Kind, Lines: job.Lines, Size: job.Size, Align: job.Align}
 	case wire.KindImage:
 		if len(job.Image) > wire.MaxImageBytes {
 			return store.Job{}, refuse(http.StatusRequestEntityTooLarge, "too_large", "image is over %d bytes", wire.MaxImageBytes)
@@ -142,7 +146,7 @@ func (s *Service) Submit(ctx context.Context, who string, job wire.Job) (store.J
 		height = cfg.Height
 		job = wire.Job{Kind: job.Kind, TapeMM: job.TapeMM, Image: job.Image}
 	default:
-		return store.Job{}, refuse(http.StatusBadRequest, "bad_request", `kind must be "barcode" or "image"`)
+		return store.Job{}, refuse(http.StatusBadRequest, "bad_request", `kind must be "barcode", "text" or "image"`)
 	}
 
 	st := s.Status()
@@ -152,6 +156,15 @@ func (s *Service) Submit(ctx context.Context, who string, job wire.Job) (store.J
 	}
 	if st.TapeMM == 0 {
 		return store.Job{}, notReady(st.Problem)
+	}
+	if job.Kind == wire.KindText {
+		// What needs drawing (glyphs, length) is checked on the board.
+		t, err := label.CheckText(label.TextLabel{Lines: job.Lines, Size: job.Size, Align: job.Align}, st.TapeMM)
+		if err != nil {
+			te := err.(*label.TextError)
+			return store.Job{}, refuse(http.StatusBadRequest, te.Code, "%s", te.Msg)
+		}
+		job.Lines, job.Size, job.Align = t.Lines, t.Size, t.Align
 	}
 	if job.Kind == wire.KindImage {
 		if job.TapeMM != st.TapeMM {

@@ -18,6 +18,7 @@ const (
 	ProblemParam = "problem"
 
 	KindBarcode = "barcode"
+	KindText    = "text"
 	KindImage   = "image"
 
 	MaxTextLen    = 80
@@ -74,6 +75,10 @@ type Job struct {
 	ID   int64  `json:"id"`
 	Kind string `json:"kind"`
 	Text string `json:"text,omitempty"` // barcode
+	// Text jobs: one or two lines, drawn on the board for the loaded tape.
+	Lines []string `json:"lines,omitempty"`
+	Size  string   `json:"size,omitempty"`  // large, medium or small
+	Align string   `json:"align,omitempty"` // left, center or right
 	// Image jobs: the tape the PNG was rendered for, and the PNG.
 	TapeMM int    `json:"tape_mm,omitempty"`
 	Image  []byte `json:"image,omitempty"`

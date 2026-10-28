@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -67,6 +68,25 @@ func TestLifecycle(t *testing.T) {
 	}
 	if _, err := s.Get(ctx, 999); !errors.Is(err, ErrNotFound) {
 		t.Errorf("get missing: %v", err)
+	}
+}
+
+func TestTextJob(t *testing.T) {
+	s, ctx := open(t), t.Context()
+	job := wire.Job{Kind: wire.KindText, Lines: []string{"Shelf A", "Bin 3"}, Size: "small", Align: "right"}
+	added, err := s.Add(ctx, job, "x", t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added.Text != "" || !slices.Equal(added.Lines, job.Lines) || added.Size != "small" || added.Align != "right" {
+		t.Errorf("added %+v", added)
+	}
+	got, err := s.Claim(ctx, t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind != wire.KindText || got.Text != "" || !slices.Equal(got.Lines, job.Lines) || got.Size != "small" || got.Align != "right" {
+		t.Errorf("claimed %+v", got)
 	}
 }
 

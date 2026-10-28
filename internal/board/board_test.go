@@ -77,6 +77,17 @@ func TestRunBarcode(t *testing.T) {
 	}
 }
 
+func TestRunText(t *testing.T) {
+	p := &fakePrinter{}
+	res := Run(t.Context(), p, wire.Job{Kind: wire.KindText, Lines: []string{"Shelf A", "Bin 3"}, Size: "medium"})
+	if !res.Printed || res.TapeMM != 24 || p.gotWantMM != 0 {
+		t.Fatalf("result %+v, asked for %d mm", res, p.gotWantMM)
+	}
+	if p.rendered.Bounds().Dy() != 128 {
+		t.Errorf("rendered %d dots high, want 128", p.rendered.Bounds().Dy())
+	}
+}
+
 func TestRunImage(t *testing.T) {
 	p := &fakePrinter{}
 	res := Run(t.Context(), p, wire.Job{Kind: wire.KindImage, TapeMM: 24, Image: pngBytes(t, 300, 128)})
@@ -95,6 +106,10 @@ func TestRunBadJobs(t *testing.T) {
 		{"non-ASCII", wire.Job{Kind: wire.KindBarcode, Text: "café"}, "bad_text"},
 		{"long text", wire.Job{Kind: wire.KindBarcode, Text: strings.Repeat("A", wire.MaxTextLen+1)}, "bad_text"},
 		{"unknown kind", wire.Job{Kind: "qr", Text: "A"}, "bad_request"},
+		{"text without lines", wire.Job{Kind: wire.KindText}, "bad_text"},
+		{"text without a glyph", wire.Job{Kind: wire.KindText, Lines: []string{"✓"}}, "bad_text"},
+		{"text over 15 cm", wire.Job{Kind: wire.KindText, Lines: []string{strings.Repeat("W", 40)}}, "too_long"},
+		{"text with a bad size", wire.Job{Kind: wire.KindText, Lines: []string{"A"}, Size: "huge"}, "bad_request"},
 		{"image without tape", wire.Job{Kind: wire.KindImage, Image: pngBytes(t, 10, 128)}, "bad_request"},
 		{"not a PNG", wire.Job{Kind: wire.KindImage, TapeMM: 24, Image: []byte("GIF89a")}, "bad_image"},
 		{"too tall", wire.Job{Kind: wire.KindImage, TapeMM: 24, Image: pngBytes(t, 10, 129)}, "bad_image"},

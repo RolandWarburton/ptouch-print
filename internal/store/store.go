@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -35,6 +36,9 @@ type Job struct {
 	ID         int64        `json:"id"`
 	Kind       string       `json:"kind"`
 	Text       string       `json:"text,omitempty"`
+	Lines      []string     `json:"lines,omitempty"`
+	Size       string       `json:"size,omitempty"`
+	Align      string       `json:"align,omitempty"`
 	TapeMM     int          `json:"tape_mm,omitempty"`
 	Status     string       `json:"status"`
 	Submitter  string       `json:"submitter"`
@@ -50,7 +54,9 @@ const schema = `
 CREATE TABLE IF NOT EXISTS jobs (
 	id          INTEGER PRIMARY KEY,
 	kind        TEXT    NOT NULL,
-	text        TEXT    NOT NULL DEFAULT '',
+	text        TEXT    NOT NULL DEFAULT '', -- a text job's lines, joined by newlines
+	size        TEXT    NOT NULL DEFAULT '',
+	align       TEXT    NOT NULL DEFAULT '',
 	tape_mm     INTEGER NOT NULL DEFAULT 0,
 	image       BLOB,
 	status      TEXT    NOT NULL,
@@ -84,8 +90,8 @@ func (s *Store) Close() error { return s.db.Close() }
 // Add queues a job. job.ID is ignored.
 func (s *Store) Add(ctx context.Context, job wire.Job, submitter string, now time.Time) (Job, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO jobs (kind, text, tape_mm, image, status, submitter, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		job.Kind, job.Text, job.TapeMM, job.Image, Queued, submitter, now.UnixMilli())
+		`INSERT INTO jobs (kind, text, size, align, tape_mm, image, status, submitter, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		job.Kind, joinLines(job), job.Size, job.Align, job.TapeMM, job.Image, Queued, submitter, now.UnixMilli())
 	if err != nil {
 		return Job{}, err
 	}
@@ -103,14 +109,15 @@ func (s *Store) Claim(ctx context.Context, now time.Time) (*wire.Job, error) {
 	err := s.db.QueryRowContext(ctx, `
 		UPDATE jobs SET status = ?, sent_at = ?
 		WHERE id = (SELECT id FROM jobs WHERE status = ? ORDER BY id LIMIT 1)
-		RETURNING id, kind, text, tape_mm, image`,
-		Sent, now.UnixMilli(), Queued).Scan(&j.ID, &j.Kind, &j.Text, &j.TapeMM, &j.Image)
+		RETURNING id, kind, text, size, align, tape_mm, image`,
+		Sent, now.UnixMilli(), Queued).Scan(&j.ID, &j.Kind, &j.Text, &j.Size, &j.Align, &j.TapeMM, &j.Image)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	j.Text, j.Lines = splitLines(j.Kind, j.Text)
 	return &j, nil
 }
 
@@ -140,7 +147,7 @@ func (s *Store) Finish(ctx context.Context, id int64, r wire.Result, now time.Ti
 	return nil
 }
 
-const columns = `id, kind, text, tape_mm, status, submitter, created_at, sent_at, finished_at, result`
+const columns = `id, kind, text, size, align, tape_mm, status, submitter, created_at, sent_at, finished_at, result`
 
 func (s *Store) Get(ctx context.Context, id int64) (Job, error) {
 	j, err := scan(s.db.QueryRowContext(ctx, `SELECT `+columns+` FROM jobs WHERE id = ?`, id))
@@ -184,9 +191,10 @@ func scan(row interface{ Scan(...any) error }) (Job, error) {
 		sent, finished sql.NullInt64
 		result         sql.NullString
 	)
-	if err := row.Scan(&j.ID, &j.Kind, &j.Text, &j.TapeMM, &j.Status, &j.Submitter, &created, &sent, &finished, &result); err != nil {
+	if err := row.Scan(&j.ID, &j.Kind, &j.Text, &j.Size, &j.Align, &j.TapeMM, &j.Status, &j.Submitter, &created, &sent, &finished, &result); err != nil {
 		return Job{}, err
 	}
+	j.Text, j.Lines = splitLines(j.Kind, j.Text)
 	j.CreatedAt = time.UnixMilli(created).UTC()
 	j.SentAt, j.FinishedAt = timePtr(sent), timePtr(finished)
 	if result.Valid {
@@ -204,4 +212,21 @@ func timePtr(ms sql.NullInt64) *time.Time {
 	}
 	t := time.UnixMilli(ms.Int64).UTC()
 	return &t
+}
+
+// A text job's lines are stored in the text column, joined by newlines; the
+// lines themselves never hold one.
+func joinLines(job wire.Job) string {
+	if job.Kind == wire.KindText {
+		return strings.Join(job.Lines, "\n")
+	}
+	return job.Text
+}
+
+// splitLines turns the text column back into a barcode's text or a text job's lines.
+func splitLines(kind, text string) (string, []string) {
+	if kind == wire.KindText {
+		return "", strings.Split(text, "\n")
+	}
+	return text, nil
 }

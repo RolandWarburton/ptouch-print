@@ -15,11 +15,8 @@ const state = {
   filter: 'all',
   kind: 'barcode',
   extra: null, // the open job when it isn't among the newest
-  size: 1, // a text label's size, as a fraction of the largest that fits
-  align: 'center',
-  glyph: null, // code point -> whether Go Bold can draw it, once the font loads
-  fontFailed: false,
-  textError: '', // why the text label can't print yet, or ''
+  size: 'large', // a text label's size and alignment
+  align: 'left',
 };
 
 // --- API -------------------------------------------------------------------
@@ -81,7 +78,9 @@ function setTime(el, iso) {
 }
 
 function jobName(job) {
-  return job.kind === 'image' ? 'Image label' : job.text;
+  if (job.kind === 'image') return 'Image label';
+  if (job.kind === 'text') return job.lines.join(' / ');
+  return job.text;
 }
 
 // The tag a job's row shows: none once printed.
@@ -260,7 +259,7 @@ function renderPane() {
   $('print-pane').hidden = !!job;
   if (!job) return;
 
-  $('job-title').textContent = jobName(job);
+  $('job-title').textContent = job.kind === 'text' ? job.lines.join('\n') : jobName(job);
   $('job-title').classList.toggle('mono', job.kind === 'barcode');
   const tag = jobTag(job) || { text: 'Printed', cls: 'wc-state' };
   $('job-state').textContent = tag.text;
@@ -274,17 +273,10 @@ function renderPane() {
   $('job-why').hidden = !why;
   $('job-why-text').textContent = why;
 
-  const bits = job.kind === 'barcode' && code128(job.text);
-  $('job-preview').hidden = !bits;
-  if (bits) {
-    $('job-barcode').setAttribute('aria-label', `Barcode preview for ${job.text}`);
-    $('job-barcode').replaceChildren(barsSVG(bits), el('span', '', job.text));
-  }
-
   const facts = [];
   if (job.result && job.result.code) facts.push(['Code', job.result.code]);
   facts.push(['May have printed', mayHavePrinted(job)]);
-  facts.push(['Kind', job.kind === 'image' ? 'Image' : 'Barcode']);
+  facts.push(['Kind', { barcode: 'Barcode', text: 'Text', image: 'Image' }[job.kind] || job.kind]);
   if (job.tape_mm) facts.push(['Tape', `${job.tape_mm} mm`]);
   facts.push(['Submitted by', job.submitter]);
   facts.push(['Queued', when(job.created_at)]);
@@ -331,9 +323,6 @@ function renderForm() {
   $('print').disabled = !ready();
 
   const st = state.status || {};
-  const preview = st.online && st.tape_mm ? `Preview, ${st.tape_mm} mm tape` : 'Preview';
-  $('preview-label').textContent = preview;
-  $('text-preview-label').textContent = preview;
   $('png-hint').textContent = st.online && st.height_dots
     ? `Must be ${st.height_dots} dots high for the ${st.tape_mm} mm tape that is loaded. Up to 1 MB.`
     : 'Must be as many dots high as the loaded tape needs. Up to 1 MB.';
@@ -342,199 +331,19 @@ function renderForm() {
   const oneLine = !!st.tape_mm && st.tape_mm !== 24;
   if (oneLine) $('line2').value = '';
   $('line2-field').hidden = oneLine;
-  drawText();
+  renderText();
 }
 
-// --- Text labels -----------------------------------------------------------
-
-// The board prints at 180 dpi. A text label is padded 14 dots at each end and
-// may be 15 cm long, padding included.
-const DOTS_PER_CM = 180 / 2.54;
-const TEXT_PAD = 14;
-const MAX_TEXT_DOTS = Math.round(15 * DOTS_PER_CM);
-const LINE_GAP = 0.1; // between two lines, as a fraction of a line's height
-
-// cmapLookup reads the font's Windows Unicode cmap (format 4, which Go Bold
-// has) and returns whether a code point has a glyph.
-function cmapLookup(buf) {
-  const v = new DataView(buf);
-  let cmap = 0;
-  for (let i = 0; i < v.getUint16(4); i++) {
-    if (v.getUint32(12 + 16 * i) === 0x636d6170) cmap = v.getUint32(12 + 16 * i + 8); // 'cmap'
-  }
-  let sub = 0;
-  for (let i = 0; i < v.getUint16(cmap + 2); i++) {
-    const r = cmap + 4 + 8 * i;
-    if (v.getUint16(r) === 3 && v.getUint16(r + 2) === 1) sub = cmap + v.getUint32(r + 4);
-  }
-  const segs = v.getUint16(sub + 6) / 2;
-  const ends = sub + 14;
-  const starts = ends + 2 * segs + 2;
-  const deltas = starts + 2 * segs;
-  const offsets = deltas + 2 * segs;
-  return (c) => {
-    for (let i = 0; i < segs; i++) {
-      if (c > v.getUint16(ends + 2 * i)) continue;
-      const start = v.getUint16(starts + 2 * i);
-      if (c < start) return false;
-      const ro = v.getUint16(offsets + 2 * i);
-      if (!ro) return ((c + v.getInt16(deltas + 2 * i)) & 0xffff) !== 0;
-      return v.getUint16(offsets + 2 * i + ro + 2 * (c - start)) !== 0;
-    }
-    return false;
-  };
-}
-
-async function loadFont() {
-  try {
-    const res = await fetch('/static/gobold.ttf');
-    if (!res.ok) throw new Error();
-    const buf = await res.arrayBuffer();
-    document.fonts.add(await new FontFace('Go Bold', buf.slice(0)).load());
-    state.glyph = cmapLookup(buf);
-  } catch {
-    state.fontFailed = true;
-  }
-  drawText();
-}
-
-function textLines() {
-  return [$('line1').value, $('line2-field').hidden ? '' : $('line2').value].filter(Boolean);
-}
-
-// drawText draws the text label onto the canvas Print sends, at the loaded
-// tape's height, and sets state.textError when it can't be printed.
-function drawText() {
-  const st = state.status || {};
-  const lines = textLines();
+// renderText shows the text label's size and alignment. The board draws the
+// label, so there is no preview: problems show when Print is pressed.
+function renderText() {
   pressed('size', 'size');
   pressed('align', 'align');
-  $('align').hidden = lines.length < 2;
-
-  let none = '';
-  let problem = '';
-  if (state.fontFailed) none = 'Couldn\'t load the Go Bold font. Reload the page to try again.';
-  else if (!state.glyph) none = 'Loading the font…';
-  else if (!st.online || !st.height_dots) none = 'The preview appears once the printer reports its tape.';
-  else if (!lines.length) none = 'Type the text to see the label.';
-  else {
-    const missing = [...new Set(lines.join(''))].filter((ch) => !state.glyph(ch.codePointAt(0)));
-    if (missing.length) problem = `Go Bold can't draw: ${missing.join(' ')}`;
-  }
-
-  const canvas = $('text-canvas');
-  canvas.hidden = !!(none || problem);
-  $('text-none').hidden = !none;
-  $('text-none').textContent = none;
-  state.textError = none || problem;
-  if (none || problem) {
-    $('text-length').textContent = problem;
-    $('text-length').classList.toggle('is-error', !!problem);
-    return;
-  }
-
-  const ctx = canvas.getContext('2d');
-  ctx.font = '100px "Go Bold"';
-  const m = ctx.measureText('Hg');
-  const ascent = m.fontBoundingBoxAscent / 100;
-  const descent = m.fontBoundingBoxDescent / 100;
-  const height = st.height_dots;
-  const lineHeight = (height / (lines.length + (lines.length - 1) * LINE_GAP)) * state.size;
-  const font = `${lineHeight / (ascent + descent)}px "Go Bold"`;
-  ctx.font = font;
-  const widths = lines.map((l) => Math.ceil(ctx.measureText(l).width));
-  const width = Math.max(...widths);
-
-  canvas.width = width + 2 * TEXT_PAD; // resets the context
-  canvas.height = height;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, height);
-  ctx.fillStyle = '#000000';
-  ctx.font = font;
-  const top = (height - lineHeight * (lines.length + (lines.length - 1) * LINE_GAP)) / 2;
-  lines.forEach((l, i) => {
-    const spare = width - widths[i];
-    const x = TEXT_PAD + { left: 0, center: spare / 2, right: spare }[state.align];
-    ctx.fillText(l, x, top + i * lineHeight * (1 + LINE_GAP) + ascent * (lineHeight / (ascent + descent)));
-  });
-
-  const cm = (canvas.width / DOTS_PER_CM).toFixed(1);
-  if (canvas.width > MAX_TEXT_DOTS) state.textError = `The label is ${cm} cm long; the limit is 15 cm.`;
-  $('text-length').textContent = state.textError || `${cm} cm of 15 cm`;
-  $('text-length').classList.toggle('is-error', !!state.textError);
+  $('align').hidden = $('line2-field').hidden || !$('line2').value.trim();
 }
 
 function renderBarcode() {
-  const text = $('text').value;
-  $('text-hint').textContent = `Code 128, up to 80 characters. ${text.length} of 80.`;
-  const box = $('barcode');
-  box.replaceChildren();
-  box.setAttribute('aria-label', text ? `Barcode preview for ${text}` : 'Barcode preview');
-  if (!text) {
-    box.append(el('span', '', 'Type the text to see the barcode.'));
-    return;
-  }
-  const bits = code128(text);
-  if (!bits) {
-    box.append(el('span', '', 'Only printable ASCII can go in a barcode.'));
-    return;
-  }
-  box.append(barsSVG(bits), el('span', '', text));
-}
-
-// Code 128 bar patterns by symbol value, 1 = bar; 106 is the stop pattern.
-const PATTERNS = (
-  '11011001100 11001101100 11001100110 10010011000 10010001100 10001001100 10011001000 10011000100 ' +
-  '10001100100 11001001000 11001000100 11000100100 10110011100 10011011100 10011001110 10111001100 10011101100 ' +
-  '10011100110 11001110010 11001011100 11001001110 11011100100 11001110100 11101101110 11101001100 11100101100 ' +
-  '11100100110 11101100100 11100110100 11100110010 11011011000 11011000110 11000110110 10100011000 10001011000 ' +
-  '10001000110 10110001000 10001101000 10001100010 11010001000 11000101000 11000100010 10110111000 10110001110 ' +
-  '10001101110 10111011000 10111000110 10001110110 11101110110 11010001110 11000101110 11011101000 11011100010 ' +
-  '11011101110 11101011000 11101000110 11100010110 11101101000 11101100010 11100011010 11101111010 11001000010 ' +
-  '11110001010 10100110000 10100001100 10010110000 10010000110 10000101100 10000100110 10110010000 10110000100 ' +
-  '10011010000 10011000010 10000110100 10000110010 11000010010 11001010000 11110111010 11000010100 10001111010 ' +
-  '10100111100 10010111100 10010011110 10111100100 10011110100 10011110010 11110100100 11110010100 11110010010 ' +
-  '11011011110 11011110110 11110110110 10101111000 10100011110 10001011110 10111101000 10111100010 11110101000 ' +
-  '11110100010 10111011110 10111101110 11101011110 11110101110 11010000100 11010010000 11010011100 ' +
-  '1100011101011'
-).split(' ');
-
-// code128 encodes printable ASCII in code set B. The printed label may use
-// code set C for runs of digits, so its bars can differ; this is a preview.
-function code128(text) {
-  const START_B = 104, STOP = 106;
-  const values = [START_B];
-  for (const ch of text) {
-    const c = ch.charCodeAt(0);
-    if (c < 0x20 || c > 0x7e) return null;
-    values.push(c - 32);
-  }
-  let sum = START_B;
-  for (let i = 1; i < values.length; i++) sum += i * values[i];
-  values.push(sum % 103, STOP);
-  return values.map((v) => PATTERNS[v]).join('');
-}
-
-function barsSVG(bits) {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${bits.length} 1`);
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.setAttribute('width', String(bits.length * 2));
-  svg.setAttribute('aria-hidden', 'true');
-  for (let i = 0; i < bits.length; ) {
-    if (bits[i] !== '1') { i++; continue; }
-    let j = i;
-    while (bits[j] === '1') j++;
-    const r = document.createElementNS(NS, 'rect');
-    r.setAttribute('x', String(i));
-    r.setAttribute('width', String(j - i));
-    r.setAttribute('height', '1');
-    r.setAttribute('fill', '#121212');
-    svg.append(r);
-    i = j;
-  }
-  return svg;
+  $('text-hint').textContent = `Code 128, up to 80 characters. ${$('text').value.length} of 80.`;
 }
 
 let previewURL = null;
@@ -572,10 +381,9 @@ async function submit(e) {
       if (!text) return say('Type the text for the barcode.', true);
       job = { kind: 'barcode', text };
     } else if (state.kind === 'text') {
-      drawText();
-      if (state.textError) return say(state.textError, true);
-      const image = $('text-canvas').toDataURL('image/png').split(',')[1];
-      job = { kind: 'image', tape_mm: state.status.tape_mm, image };
+      const lines = [$('line1').value, $('line2-field').hidden ? '' : $('line2').value].filter((l) => l.trim());
+      if (!lines.length) return say('Type the text for the label.', true);
+      job = { kind: 'text', lines, size: state.size, align: state.align };
     } else {
       const file = $('png').files[0];
       if (!file) return say('Choose a PNG image.', true);
@@ -623,12 +431,11 @@ async function start() {
     $(key).addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      state[key] = key === 'size' ? Number(b.dataset.size) : b.dataset.align;
-      drawText();
+      state[key] = b.dataset[key];
+      renderText();
     });
   }
-  $('line1').addEventListener('input', drawText);
-  $('line2').addEventListener('input', drawText);
+  $('line2').addEventListener('input', renderText);
   $('png').addEventListener('change', showImage);
   $('print-form').addEventListener('submit', submit);
   $('sign-out').addEventListener('click', async () => {
@@ -641,7 +448,6 @@ async function start() {
   });
   document.addEventListener('visibilitychange', poll);
   renderBarcode();
-  loadFont();
 
   try {
     const me = await api('/auth/me');
