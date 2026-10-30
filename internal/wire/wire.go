@@ -5,7 +5,8 @@
 // nothing (204), and reports each job it took with POST ResultPath(id). When
 // the printer can't print, the poll says tape_mm=0 and adds ProblemParam with
 // the reason, one of the result codes (editor_lite, printer_error, …); a poll
-// without it means the printer is ready.
+// without it means the printer is ready. WiFiParam, when present, is the name
+// of the Wi-Fi network the board is on.
 package wire
 
 import (
@@ -16,6 +17,7 @@ import (
 const (
 	NextPath     = "/board/next"
 	ProblemParam = "problem"
+	WiFiParam    = "wifi"
 
 	KindBarcode = "barcode"
 	KindText    = "text"
