@@ -10,14 +10,20 @@ import (
 	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
-const mcpVersion = "0.1.0"
+const mcpVersion = "0.2.0"
 
 type printArgs struct {
 	Text string `json:"text" jsonschema:"What the barcode encodes, usually an asset tag such as TG17573. Printable ASCII, at most 80 characters; it's also printed under the barcode."`
 }
 
+type textArgs struct {
+	Lines []string `json:"lines" jsonschema:"The label's text: one line, or two when 24 mm tape is loaded. Newlines and other control characters are removed, and each line is trimmed. Characters the Go Bold font can't draw are refused, as is a label over 15 cm long."`
+	Size  string   `json:"size,omitempty" jsonschema:"large (default), medium or small: the tallest text that fits the tape, or 75% or 50% of it"`
+	Align string   `json:"align,omitempty" jsonschema:"left (default), center or right; only matters with two lines"`
+}
+
 type jobArgs struct {
-	ID int64 `json:"id" jsonschema:"Job id, from print_barcode or list_jobs"`
+	ID int64 `json:"id" jsonschema:"Job id, from print_barcode, print_text or list_jobs"`
 }
 
 type listArgs struct {
@@ -27,11 +33,13 @@ type listArgs struct {
 // NewMCP builds the MCP server. Tools call the Service directly.
 func NewMCP(svc *Service) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "ptouch", Version: mcpVersion}, &mcp.ServerOptions{
-		Instructions: "Prints Code 128 barcode labels on a Brother P-touch label printer. print_barcode only queues " +
-			"the label; it prints within about 20 seconds. Call get_job to confirm, and only tell the user it printed " +
-			"when the status is done. A job is never retried: if it failed, or stays sent, submit a new one only if " +
-			"the user asks, since a label may already have come out. When print_barcode is refused because the " +
-			"printer can't print, pass on the fix it gives; printer_status shows the same without printing.",
+		Instructions: "Prints Code 128 barcode labels and text labels on a Brother P-touch label printer. " +
+			"print_barcode and print_text only queue the label; it prints within about 20 seconds. Call get_job to " +
+			"confirm, and only tell the user it printed when the status is done: a text label too long or with a " +
+			"character the font can't draw is only found then, and fails. A job is never retried: if it failed, or " +
+			"stays sent, submit a new one only if the user asks, since a label may already have come out. When a " +
+			"print is refused because the printer can't print, pass on the fix it gives; printer_status shows the " +
+			"same without printing.",
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -39,6 +47,17 @@ func NewMCP(svc *Service) *mcp.Server {
 		Description: "Queue a barcode label for the loaded tape. Returns the job (status queued) or why it was refused, e.g. the printer is offline.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in printArgs) (*mcp.CallToolResult, any, error) {
 		j, err := svc.Submit(ctx, Submitter(ctx), wire.Job{Kind: wire.KindBarcode, Text: in.Text})
+		if err != nil {
+			return errorResult(err)
+		}
+		return jsonResult(j)
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "print_text",
+		Description: "Queue a text label for the loaded tape. Returns the job (status queued) or why it was refused, e.g. the printer is offline or two lines on 12 mm tape.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in textArgs) (*mcp.CallToolResult, any, error) {
+		j, err := svc.Submit(ctx, Submitter(ctx), wire.Job{Kind: wire.KindText, Lines: in.Lines, Size: in.Size, Align: in.Align})
 		if err != nil {
 			return errorResult(err)
 		}

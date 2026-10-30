@@ -152,7 +152,8 @@ func (h handlers) result(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// submit takes {"kind": "barcode", "text": "..."} or
+// submit takes {"kind": "barcode", "text": "..."},
+// {"kind": "text", "lines": ["...", "..."], "size": "large", "align": "left"} or
 // {"kind": "image", "tape_mm": 24, "image": "<base64 PNG>"}.
 func (h handlers) submit(w http.ResponseWriter, r *http.Request) {
 	var job wire.Job

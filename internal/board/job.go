@@ -37,6 +37,9 @@ func Run(ctx context.Context, p Printer, job wire.Job) wire.Result {
 			return wire.Failed(wire.CodeBadText, msg)
 		}
 		render = func(t wire.TapeSpec) (image.Image, error) { return label.Barcode(job.Text, t.Dots) }
+	case wire.KindText:
+		text := label.TextLabel{Lines: job.Lines, Size: job.Size, Align: job.Align}
+		render = func(t wire.TapeSpec) (image.Image, error) { return label.Text(text, t) }
 	case wire.KindImage:
 		if job.TapeMM <= 0 {
 			return wire.Failed(wire.CodeBadRequest, "image job has no tape_mm")
@@ -80,6 +83,10 @@ func decodePNG(f io.ReadSeeker) (image.Image, error) {
 
 func classify(err error) wire.Result {
 	resp := wire.Result{Error: err.Error()}
+	if te, ok := errors.AsType[*label.TextError](err); ok {
+		resp.Code = te.Code
+		return resp
+	}
 	if pe, ok := errors.AsType[*ptouch.PrinterError](err); ok {
 		resp.PrinterErrors = pe.Errors
 		if pe.AfterSend {

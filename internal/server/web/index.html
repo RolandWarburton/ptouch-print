@@ -77,12 +77,6 @@
               <input class="wc-input mono" id="text" maxlength="80" autocomplete="off" spellcheck="false">
               <p class="hint" id="text-hint">Code 128, up to 80 characters.</p>
             </div>
-            <div>
-              <span class="wc-label" id="preview-label">Preview</span>
-              <div class="preview">
-                <div class="barcode" role="img" id="barcode" aria-label="Barcode preview"></div>
-              </div>
-            </div>
           </div>
 
           <div class="stack-12" id="text-fields" hidden>
@@ -97,23 +91,15 @@
             </div>
             <div class="actions">
               <span class="wc-seg" role="group" aria-label="Size" id="size">
-                <button type="button" aria-pressed="true" data-size="1">Large</button>
-                <button type="button" aria-pressed="false" data-size="0.75">Medium</button>
-                <button type="button" aria-pressed="false" data-size="0.5">Small</button>
+                <button type="button" aria-pressed="true" data-size="large">Large</button>
+                <button type="button" aria-pressed="false" data-size="medium">Medium</button>
+                <button type="button" aria-pressed="false" data-size="small">Small</button>
               </span>
               <span class="wc-seg" role="group" aria-label="Alignment" id="align" hidden>
-                <button type="button" aria-pressed="false" data-align="left">Left</button>
-                <button type="button" aria-pressed="true" data-align="center">Centre</button>
+                <button type="button" aria-pressed="true" data-align="left">Left</button>
+                <button type="button" aria-pressed="false" data-align="center">Centre</button>
                 <button type="button" aria-pressed="false" data-align="right">Right</button>
               </span>
-            </div>
-            <div>
-              <span class="wc-label" id="text-preview-label">Preview</span>
-              <div class="preview">
-                <canvas id="text-canvas" hidden></canvas>
-                <p class="muted" id="text-none"></p>
-              </div>
-              <p class="hint" id="text-length"></p>
             </div>
           </div>
 
@@ -149,9 +135,6 @@
           <div class="why" id="job-why" hidden>
             <span class="wc-label">Why</span>
             <p id="job-why-text"></p>
-          </div>
-          <div class="preview" id="job-preview" hidden>
-            <div class="barcode" role="img" id="job-barcode"></div>
           </div>
           <dl class="wc-facts" id="job-facts"></dl>
         </section>

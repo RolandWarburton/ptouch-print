@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"io"
@@ -252,6 +253,43 @@ func TestImageJobs(t *testing.T) {
 	}
 }
 
+func TestTextJobs(t *testing.T) {
+	e := newEnv(t, nil)
+	e.poll("12")
+	if code, body := e.do("POST", "/api/jobs", clientToken, map[string]any{"kind": "text", "lines": []string{"A", "B"}}); code != 400 ||
+		body["code"] != "bad_text" || !strings.Contains(body["error"].(string), "24 mm") {
+		t.Errorf("two lines on 12 mm: %d %v", code, body)
+	}
+	e.poll("24")
+	for _, tt := range []struct {
+		name string
+		job  map[string]any
+		code string
+	}{
+		{"no lines", map[string]any{"kind": "text"}, "bad_text"},
+		{"three lines", map[string]any{"kind": "text", "lines": []string{"A", "B", "C"}}, "bad_text"},
+		{"empty line", map[string]any{"kind": "text", "lines": []string{"A", " \t"}}, "bad_text"},
+		{"bad size", map[string]any{"kind": "text", "lines": []string{"A"}, "size": "huge"}, "bad_request"},
+		{"bad align", map[string]any{"kind": "text", "lines": []string{"A"}, "align": "middle"}, "bad_request"},
+	} {
+		if code, body := e.do("POST", "/api/jobs", clientToken, tt.job); code != 400 || body["code"] != tt.code {
+			t.Errorf("%s: %d %v, want 400 %s", tt.name, code, body, tt.code)
+		}
+	}
+
+	code, job := e.do("POST", "/api/jobs", clientToken, map[string]any{"kind": "text", "lines": []string{" Shelf A\n", "Bin 3"}})
+	if code != 201 || job["kind"] != "text" || fmt.Sprint(job["lines"]) != "[Shelf A Bin 3]" ||
+		job["size"] != "large" || job["align"] != "left" || job["text"] != nil {
+		t.Fatalf("submit: %d %v", code, job)
+	}
+	if _, sent := e.poll("24"); sent["kind"] != "text" || fmt.Sprint(sent["lines"]) != "[Shelf A Bin 3]" || sent["size"] != "large" {
+		t.Errorf("board got %v", sent)
+	}
+	if _, j := e.do("GET", "/api/jobs/1", clientToken, nil); fmt.Sprint(j["lines"]) != "[Shelf A Bin 3]" || j["align"] != "left" {
+		t.Errorf("read back: %v", j)
+	}
+}
+
 func TestTokensAreSeparate(t *testing.T) {
 	e := newEnv(t, nil)
 	if code, _ := e.do("GET", "/board/next?tape_mm=24", clientToken, nil); code != 401 {
@@ -300,6 +338,14 @@ func TestMCPTools(t *testing.T) {
 	if code, body := rpc(t, e.url, clientToken, "print_barcode", map[string]any{"text": "TG17573"}); code != 200 ||
 		!strings.Contains(body, `\"status\":\"queued\"`) {
 		t.Fatalf("print: %d %s", code, body)
+	}
+	if code, body := rpc(t, e.url, clientToken, "print_text", map[string]any{"lines": []string{"Shelf A"}, "size": "small"}); code != 200 ||
+		!strings.Contains(body, `\"lines\":[\"Shelf A\"]`) || !strings.Contains(body, `\"status\":\"queued\"`) {
+		t.Fatalf("print_text: %d %s", code, body)
+	}
+	if _, body := rpc(t, e.url, clientToken, "print_text", map[string]any{"lines": []string{}}); !strings.Contains(body, `"isError":true`) ||
+		!strings.Contains(body, "bad_text") {
+		t.Errorf("print_text without lines: %s", body)
 	}
 	// The caller's identity reaches the tool and is stored as the submitter.
 	if j, _ := e.svc.Get(t.Context(), 1); j.Submitter != "token:ci" {
