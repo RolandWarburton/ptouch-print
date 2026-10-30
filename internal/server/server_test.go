@@ -155,6 +155,28 @@ func TestOfflineAfterMissedPolls(t *testing.T) {
 	}
 }
 
+// The board's Wi-Fi network shows in the status, and stays there while it's offline.
+func TestWiFi(t *testing.T) {
+	e := newEnv(t, nil)
+	e.poll("24&wifi=Home%20Net")
+	if _, st := e.do("GET", "/api/status", clientToken, nil); st["wifi"] != "Home Net" {
+		t.Errorf("status %v", st)
+	}
+	e.now = e.now.Add(OfflineAfter + time.Second)
+	if _, st := e.do("GET", "/api/status", clientToken, nil); st["online"] != false || st["wifi"] != "Home Net" {
+		t.Errorf("offline status %v", st)
+	}
+	// A name that isn't printable, or is too long for an SSID, is dropped; the poll still works.
+	for _, name := range []string{"a%0Ab", strings.Repeat("x", 33), "%FF", ""} {
+		if code, _ := e.poll("24&wifi=" + name); code != 204 {
+			t.Errorf("wifi %q: poll %d", name, code)
+		}
+		if _, st := e.do("GET", "/api/status", clientToken, nil); st["wifi"] != nil {
+			t.Errorf("wifi %q: status %v", name, st)
+		}
+	}
+}
+
 func TestPrinterProblems(t *testing.T) {
 	e := newEnv(t, nil)
 	barcode := map[string]any{"kind": "barcode", "text": "A"}

@@ -151,6 +151,7 @@ type fakeServer struct {
 	queue    []wire.Job
 	tapes    []string
 	problems []string
+	wifi     []string
 	results  map[int64]wire.Result
 	auth     []string
 }
@@ -163,6 +164,7 @@ func (s *fakeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && r.URL.Path == wire.NextPath:
 		s.tapes = append(s.tapes, r.URL.Query().Get("tape_mm"))
 		s.problems = append(s.problems, r.URL.Query().Get(wire.ProblemParam))
+		s.wifi = append(s.wifi, r.URL.Query().Get(wire.WiFiParam))
 		if len(s.queue) == 0 {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -202,6 +204,21 @@ func TestPoll(t *testing.T) {
 	}
 	if strings.Join(s.tapes, ",") != "24,24" || s.auth[0] != "Bearer tok" {
 		t.Errorf("tapes %v, auth %v", s.tapes, s.auth)
+	}
+}
+
+func TestPollSendsWiFi(t *testing.T) {
+	s := &fakeServer{results: map[int64]wire.Result{}}
+	p := newPoller(t, s, &fakePrinter{})
+	if err := p.Poll(t.Context()); err != nil { // no WiFi func
+		t.Fatal(err)
+	}
+	p.WiFi = func() string { return "Home & Café" }
+	if err := p.Poll(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if s.wifi[0] != "" || s.wifi[1] != "Home & Café" {
+		t.Errorf("wifi %q", s.wifi)
 	}
 }
 
