@@ -61,6 +61,7 @@ func main() {
 		Printer:   printer,
 		Client:    &http.Client{Timeout: 30 * time.Second},
 		Log:       log,
+		WiFi:      board.WiFiName,
 	}).Run(ctx)
 	log.Info("stopped")
 }

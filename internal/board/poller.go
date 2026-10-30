@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ type Poller struct {
 	Printer   Printer
 	Client    *http.Client
 	Log       *slog.Logger
+	WiFi      func() string // the Wi-Fi network's name, sent with each poll; may be nil
 }
 
 // Run polls until ctx is done. A job already taken from the server is printed
@@ -81,11 +83,16 @@ func (p *Poller) printerState(ctx context.Context) (tapeMM int, problem string) 
 }
 
 func (p *Poller) next(ctx context.Context, tapeMM int, problem string) (*wire.Job, error) {
-	url := strings.TrimRight(p.ServerURL, "/") + wire.NextPath + "?tape_mm=" + strconv.Itoa(tapeMM)
+	u := strings.TrimRight(p.ServerURL, "/") + wire.NextPath + "?tape_mm=" + strconv.Itoa(tapeMM)
 	if problem != "" {
-		url += "&" + wire.ProblemParam + "=" + problem
+		u += "&" + wire.ProblemParam + "=" + problem
 	}
-	res, err := p.do(ctx, http.MethodGet, url, nil)
+	if p.WiFi != nil {
+		if name := p.WiFi(); name != "" {
+			u += "&" + wire.WiFiParam + "=" + url.QueryEscape(name)
+		}
+	}
+	res, err := p.do(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}

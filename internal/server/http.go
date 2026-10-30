@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -24,14 +27,14 @@ type Options struct {
 
 // NewHandler serves every route:
 //
-//	GET  /health                                       unauthenticated, for container health checks
-//	GET  /.well-known/oauth-protected-resource[/mcp]   with Dex: tells claude.ai to sign in there
-//	GET  /board/next?tape_mm=N[&problem=CODE]          board: take the next job (200) or none (204)
-//	POST /board/jobs/{id}/result                       board: report a job's result
-//	POST /api/jobs                                     client: submit a job
-//	GET  /api/jobs[?limit=N], /api/jobs/{id}           client: newest jobs, one job
-//	GET  /api/status                                   client: is the board online, which tape
-//	POST /mcp                                          client: MCP Streamable HTTP, stateless
+//	GET  /health                                          unauthenticated, for container health checks
+//	GET  /.well-known/oauth-protected-resource[/mcp]      with Dex: tells claude.ai to sign in there
+//	GET  /board/next?tape_mm=N[&problem=CODE][&wifi=NAME] board: take the next job (200) or none (204)
+//	POST /board/jobs/{id}/result                          board: report a job's result
+//	POST /api/jobs                                        client: submit a job
+//	GET  /api/jobs[?limit=N], /api/jobs/{id}              client: newest jobs, one job
+//	GET  /api/status                                      client: is the board online, which tape
+//	POST /mcp                                             client: MCP Streamable HTTP, stateless
 //
 // With WebUI, also the page at / and /static/, and sign-in at /auth/*; /api/*
 // then accepts a signed-in browser's session cookie too.
@@ -100,6 +103,16 @@ type handlers struct{ svc *Service }
 // shows it, so it accepts codes it doesn't know rather than breaking on a newer board.
 var problemCode = regexp.MustCompile(`^[a-z_]{1,32}$`)
 
+// wifiName is the board's Wi-Fi network name if it looks like one (at most 32
+// bytes of printable UTF-8), else "". It's only shown, so a strange name is
+// dropped rather than failing the poll.
+func wifiName(s string) string {
+	if len(s) > 32 || !utf8.ValidString(s) || strings.IndexFunc(s, func(r rune) bool { return !unicode.IsPrint(r) }) >= 0 {
+		return ""
+	}
+	return s
+}
+
 func (h handlers) next(w http.ResponseWriter, r *http.Request) {
 	tape, err := strconv.Atoi(r.URL.Query().Get("tape_mm"))
 	if err != nil || tape < 0 {
@@ -111,7 +124,7 @@ func (h handlers) next(w http.ResponseWriter, r *http.Request) {
 		writeError(w, refuse(http.StatusBadRequest, "bad_request", "problem must be a lower-case code like editor_lite"))
 		return
 	}
-	job, err := h.svc.Next(r.Context(), tape, problem)
+	job, err := h.svc.Next(r.Context(), tape, problem, wifiName(r.URL.Query().Get(wire.WiFiParam)))
 	switch {
 	case err != nil:
 		writeError(w, err)

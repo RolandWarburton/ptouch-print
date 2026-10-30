@@ -59,7 +59,8 @@ func NewMCP(svc *Service) *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "printer_status",
 		Description: "Whether the printer can print now: online (checked in within the last minute), the loaded tape, " +
-			"and when it can't print, the problem (e.g. editor_lite, printer_error, not_connected).",
+			"and when it can't print, the problem (e.g. editor_lite, printer_error, not_connected). " +
+			"wifi is the Wi-Fi network the board was on at its last check-in.",
 	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
 		return jsonResult(svc.Status())
 	})

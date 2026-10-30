@@ -46,11 +46,13 @@ type Service struct {
 	log   *slog.Logger
 	now   func() time.Time
 
-	// What the board's last poll said: the tape, or 0 and why it can't print.
+	// What the board's last poll said: the tape, or 0 and why it can't print,
+	// and the Wi-Fi network it's on.
 	mu       sync.Mutex
 	lastPoll time.Time
 	tapeMM   int
 	problem  string
+	wifi     string
 }
 
 // problems says how to fix each reason the board gives for not printing.
@@ -84,12 +86,15 @@ func NewService(st *store.Store, log *slog.Logger) *Service {
 // Next records the board's poll and hands it the oldest queued job, if any,
 // even while the printer has a problem: that job fails now rather than
 // printing later, unexpectedly.
-func (s *Service) Next(ctx context.Context, tapeMM int, problem string) (*wire.Job, error) {
+func (s *Service) Next(ctx context.Context, tapeMM int, problem, wifi string) (*wire.Job, error) {
 	now := s.now()
 	s.mu.Lock()
-	was := s.problem
-	s.lastPoll, s.tapeMM, s.problem = now, tapeMM, problem
+	was, wasWiFi := s.problem, s.wifi
+	s.lastPoll, s.tapeMM, s.problem, s.wifi = now, tapeMM, problem, wifi
 	s.mu.Unlock()
+	if wifi != wasWiFi {
+		s.log.Info("board's Wi-Fi", "wifi", wifi, "was", wasWiFi)
+	}
 	switch {
 	case problem != was && problem != "":
 		s.log.Warn("printer can't print", "problem", problem)
@@ -195,16 +200,18 @@ type BoardStatus struct {
 	HeightDots int        `json:"height_dots,omitempty"` // the image height the tape needs
 	Problem    string     `json:"problem,omitempty"`     // why it can't print, e.g. editor_lite
 	Fix        string     `json:"fix,omitempty"`         // how to fix Problem, for people
+	WiFi       string     `json:"wifi,omitempty"`        // the board's Wi-Fi network at LastPoll
 }
 
 func (s *Service) Status() BoardStatus {
 	s.mu.Lock()
-	last, tape, problem := s.lastPoll.UTC(), s.tapeMM, s.problem
+	last, tape, problem, wifi := s.lastPoll.UTC(), s.tapeMM, s.problem, s.wifi
 	s.mu.Unlock()
 	if last.IsZero() {
 		return BoardStatus{}
 	}
-	st := BoardStatus{Online: s.now().Sub(last) <= OfflineAfter, LastPoll: &last}
+	// The Wi-Fi network is kept while offline: where the board was is a clue to why.
+	st := BoardStatus{Online: s.now().Sub(last) <= OfflineAfter, LastPoll: &last, WiFi: wifi}
 	if st.Online {
 		st.TapeMM, st.Problem = tape, problem
 		if problem != "" {

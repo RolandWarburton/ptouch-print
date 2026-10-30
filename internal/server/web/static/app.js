@@ -174,6 +174,7 @@ function renderPrinter() {
   $('height').textContent = st.online && st.height_dots ? `${st.height_dots} dots` : '—';
   if (st.last_poll) setTime($('checked'), st.last_poll);
   else $('checked').textContent = 'Never';
+  $('wifi').textContent = st.wifi || '—';
 }
 
 const rowCache = new Map(); // job id -> { key, li, time }
