@@ -1,4 +1,4 @@
-# P-touch command server: the board polls it, REST and MCP clients submit to it.
+# Label command server: the printers' boards poll it, REST and MCP clients submit to it.
 #
 # Deploy on the host that runs the other MCP servers: copy this project to
 # ~/services/ptouch/, create .env from .env.example, then:
@@ -6,7 +6,7 @@
 #   docker compose up -d --build
 #
 # Published through Traefik at https://ptouch.<MCP_DOMAIN>:
-#   /board/*   the board (board token)
+#   /board/*   the boards (each with its printer's token)
 #   /api/*     REST clients (named client tokens, or Dex)
 #   /mcp       claude.ai (Dex client ptouch-mcp) or a client token
 #   /, /auth/* the web UI, when WEB_UI is true (Dex client ptouch-web)
@@ -45,7 +45,7 @@ services:
       - services
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ptouch.rule=Host(`${PTOUCH_HOST:-ptouch}.${MCP_DOMAIN:?MCP_DOMAIN must be set in .env}`)"
+      - "traefik.http.routers.ptouch.rule=Host(`${PRINT_HOST:-ptouch}.${MCP_DOMAIN:?MCP_DOMAIN must be set in .env}`)"
       - "traefik.http.routers.ptouch.entrypoints=websecure"
       - "traefik.http.routers.ptouch.tls=true"
       - "traefik.http.routers.ptouch.tls.certresolver=letsencrypt"

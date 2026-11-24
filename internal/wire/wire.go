@@ -1,12 +1,14 @@
-// Package wire holds what the board and the command server send each other, so
-// the two binaries can't disagree about the format.
+// Package wire holds what the boards and the command server send each other, so
+// they can't disagree about the format. The LabelWriter board is firmware in
+// another repo (dymo-print) that keeps its own copy of this.
 //
-// The board asks for work with GET NextPath?tape_mm=N, getting a Job (200) or
+// A board asks for work with GET NextPath?media=ID, getting a Job (200) or
 // nothing (204), and reports each job it took with POST ResultPath(id). When
-// the printer can't print, the poll says tape_mm=0 and adds ProblemParam with
-// the reason, one of the result codes (editor_lite, printer_error, …); a poll
-// without it means the printer is ready. WiFiParam, when present, is the name
-// of the Wi-Fi network the board is on.
+// the printer can't print, the poll says media= (empty) and adds ProblemParam
+// with the reason, one of the result codes (editor_lite, printer_error, …); a
+// poll without it means the printer is ready. WiFiParam, when present, is the
+// name of the Wi-Fi network the board is on. A P-touch board may send TapeParam
+// (tape_mm=N, or 0) in place of MediaParam.
 package wire
 
 import (
@@ -16,12 +18,17 @@ import (
 
 const (
 	NextPath     = "/board/next"
+	MediaParam   = "media"
+	TapeParam    = "tape_mm"
 	ProblemParam = "problem"
 	WiFiParam    = "wifi"
 
 	KindBarcode = "barcode"
 	KindText    = "text"
 	KindImage   = "image"
+
+	OrientPortrait  = "portrait"  // the label's short side is the text's width
+	OrientLandscape = "landscape" // the long side is
 
 	MaxTextLen    = 80
 	MaxImageBytes = 1 << 20
@@ -30,24 +37,26 @@ const (
 // Result codes: why a job failed, or, sent as ProblemParam, why the printer
 // can't print.
 const (
-	CodeBadText         = "bad_text"
-	CodeBadRequest      = "bad_request"
-	CodeBadImage        = "bad_image"
-	CodePrintFailed     = "print_failed" // the printer reported an error after the job was sent
-	CodePrinterError    = "printer_error"
-	CodeUnsupportedTape = "unsupported_tape"
-	CodeTapeMismatch    = "tape_mismatch"
-	CodeWrongHeight     = "wrong_height"
-	CodeTooLong         = "too_long"
-	CodeEmptyLabel      = "empty_label"
-	CodeNotConnected    = "not_connected"
-	CodeEditorLite      = "editor_lite"
-	CodeNoReply         = "no_reply"
-	CodeBusy            = "busy"
-	CodeUnconfirmed     = "unconfirmed" // may have printed
-	CodeCanceled        = "canceled"
-	CodePermission      = "permission"
-	CodeInternal        = "internal"
+	CodeBadText          = "bad_text"
+	CodeBadRequest       = "bad_request"
+	CodeBadImage         = "bad_image"
+	CodePrintFailed      = "print_failed" // the printer reported an error after the job was sent
+	CodePrinterError     = "printer_error"
+	CodeUnsupportedTape  = "unsupported_tape"
+	CodeTapeMismatch     = "tape_mismatch"
+	CodeUnsupportedMedia = "unsupported_media"
+	CodeWrongMedia       = "wrong_media" // the job is for other media than is loaded
+	CodeWrongHeight      = "wrong_height"
+	CodeTooLong          = "too_long"
+	CodeEmptyLabel       = "empty_label"
+	CodeNotConnected     = "not_connected"
+	CodeEditorLite       = "editor_lite"
+	CodeNoReply          = "no_reply"
+	CodeBusy             = "busy"
+	CodeUnconfirmed      = "unconfirmed" // may have printed
+	CodeCanceled         = "canceled"
+	CodePermission       = "permission"
+	CodeInternal         = "internal"
 )
 
 // TapeSpec is the printable area of one tape width.
@@ -69,19 +78,70 @@ func Tape(mm int) (TapeSpec, bool) {
 	return t, ok
 }
 
+// Printer families: they decide which media, label kinds and options apply.
+const (
+	FamilyPTouch = "ptouch"
+	FamilyLW450  = "lw450"
+)
+
+// Media is one kind of label stock. Width and Length are the printable dots
+// across the head and along the feed; Length is 0 for tape, which is cut to fit
+// the label. Pitch is a label's length from one to the next, in dots. The
+// LabelWriter's rows match media_t in dymo-print's label.c.
+type Media struct {
+	ID     string
+	Name   string
+	Family string
+	TapeMM int // tape only
+	Width  int
+	Length int
+	Pitch  int
+}
+
+var media = []Media{
+	{ID: "tape-12", Name: "12 mm tape", Family: FamilyPTouch, TapeMM: 12, Width: tapes[12].Dots},
+	{ID: "tape-24", Name: "24 mm tape", Family: FamilyPTouch, TapeMM: 24, Width: tapes[24].Dots},
+	{ID: "large-address", Name: "DYMO Large Address S0722400", Family: FamilyLW450, Width: 400, Length: 950, Pitch: 1050},
+}
+
+// FindMedia looks up media that printers of family take by its id.
+func FindMedia(family, id string) (Media, bool) {
+	for _, m := range media {
+		if m.Family == family && m.ID == id {
+			return m, true
+		}
+	}
+	return Media{}, false
+}
+
+// ImageSize is the size in dots an image for m must be. A width of 0 means any:
+// an image for tape runs along it, so only its height is fixed.
+func (m Media) ImageSize() (width, height int) {
+	if m.Length == 0 {
+		return 0, m.Width
+	}
+	return m.Width, m.Length
+}
+
 // ResultPath is where the board reports the result of job id.
 func ResultPath(id int64) string { return "/board/jobs/" + strconv.FormatInt(id, 10) + "/result" }
 
-// Job is one label for the board to print.
+// Job is one label for a board to print.
 type Job struct {
-	ID   int64  `json:"id"`
-	Kind string `json:"kind"`
-	Text string `json:"text,omitempty"` // barcode
-	// Text jobs: one or two lines, drawn on the board for the loaded tape.
+	ID      int64  `json:"id"`
+	Printer string `json:"printer,omitempty"` // which printer; only on submit, as a board only gets its own jobs
+	Kind    string `json:"kind"`
+	// The media the job is for. Always set for a LabelWriter's board, which
+	// must not print the job on any other; a P-touch's board doesn't check it.
+	Media       string `json:"media,omitempty"`
+	Orientation string `json:"orientation,omitempty"` // LabelWriter text and barcodes: portrait or landscape
+	Text        string `json:"text,omitempty"`        // barcode
+	// Text jobs: one or two lines on tape, up to eight on a LabelWriter, drawn
+	// on the board for the loaded media.
 	Lines []string `json:"lines,omitempty"`
 	Size  string   `json:"size,omitempty"`  // large, medium or small
 	Align string   `json:"align,omitempty"` // left, center or right
-	// Image jobs: the tape the PNG was rendered for, and the PNG.
+	// Image jobs: the PNG, and for a P-touch the tape it was rendered for.
 	TapeMM int    `json:"tape_mm,omitempty"`
 	Image  []byte `json:"image,omitempty"`
 }
@@ -96,6 +156,7 @@ type Result struct {
 	Error          string   `json:"error,omitempty"`
 	PrinterErrors  []string `json:"printer_errors,omitempty"`
 	LoadedTapeMM   int      `json:"loaded_tape_mm,omitempty"`
+	LoadedMedia    string   `json:"loaded_media,omitempty"`
 	MayHavePrinted bool     `json:"may_have_printed,omitempty"`
 }
 

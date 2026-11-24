@@ -8,6 +8,9 @@ allowing for one-way communication.
 
 It supports 12 mm and 24 mm tape. Text, Barcodes, and PNGs.
 
+One command server can drive several printers, each with its own board and
+token, including DYMO LabelWriters. A job names its printer.
+
 ```
   MCP client               scripts, curl
   (signs in via Dex)       (client token)

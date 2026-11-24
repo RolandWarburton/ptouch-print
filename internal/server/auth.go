@@ -19,7 +19,7 @@ import (
 )
 
 // Who may call what:
-//   - /board/*: the board, with the one board token.
+//   - /board/*: each printer's board, with that printer's token.
 //   - /api/* and /mcp: clients, with a named client token or (when Dex is
 //     configured) a Dex token for an allowed email, as bookstack-mcp does.
 //
@@ -67,6 +67,8 @@ func validHash(h string) bool {
 
 type identityKey struct{}
 
+const tokenPrefix = "token:"
+
 // Submitter is who the request was authenticated as: an email from Dex, or
 // "token:<name>" for a static token.
 func Submitter(ctx context.Context) string {
@@ -82,7 +84,7 @@ type authenticator interface {
 
 func (t Tokens) check(_ context.Context, token string) (string, int, string) {
 	if name, ok := t[HashToken(token)]; ok {
-		return "token:" + name, 0, ""
+		return tokenPrefix + name, 0, ""
 	}
 	return "", http.StatusUnauthorized, "missing or wrong bearer token"
 }

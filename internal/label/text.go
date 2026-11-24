@@ -25,6 +25,7 @@ const (
 	lineGap     = 0.1  // between two lines, as a fraction of a line's height
 	twoLineMM   = 24   // the narrowest tape that takes a second line
 	metricsSize = 100  // the size the font's proportions are measured at
+	dieCutLines = 8    // the most lines a LabelWriter's board draws
 )
 
 var sizes = map[string]float64{"large": 1, "medium": 0.75, "small": 0.5}
@@ -52,8 +53,7 @@ func textErr(code, format string, args ...any) *TextError {
 }
 
 // CheckText cleans a text label and checks what can be checked without
-// drawing it, for tapeMM tape. Its errors are *TextError. Control characters
-// are removed and each line trimmed; the size and alignment get their defaults.
+// drawing it, for tapeMM tape. Its errors are *TextError.
 func CheckText(t TextLabel, tapeMM int) (TextLabel, error) {
 	if len(t.Lines) == 0 || len(t.Lines) > 2 {
 		return TextLabel{}, textErr(wire.CodeBadText, "a text label has one or two lines")
@@ -61,6 +61,30 @@ func CheckText(t TextLabel, tapeMM int) (TextLabel, error) {
 	if len(t.Lines) == 2 && tapeMM < twoLineMM {
 		return TextLabel{}, textErr(wire.CodeBadText, "two lines need %d mm tape; %d mm is loaded", twoLineMM, tapeMM)
 	}
+	return cleanText(t)
+}
+
+// CheckDieCutText is CheckText for a LabelWriter, whose board draws text itself
+// (dymo-print's label.c): more lines, but only ASCII.
+func CheckDieCutText(t TextLabel) (TextLabel, error) {
+	if len(t.Lines) == 0 || len(t.Lines) > dieCutLines {
+		return TextLabel{}, textErr(wire.CodeBadText, "a text label has 1 to %d lines", dieCutLines)
+	}
+	clean, err := cleanText(t)
+	if err != nil {
+		return TextLabel{}, err
+	}
+	for i, l := range clean.Lines {
+		if msg := wire.ValidateText(l); msg != "" {
+			return TextLabel{}, textErr(wire.CodeBadText, "line %d: %s", i+1, msg)
+		}
+	}
+	return clean, nil
+}
+
+// cleanText removes control characters and trims each line, refusing one left
+// empty, and gives the size and alignment their defaults.
+func cleanText(t TextLabel) (TextLabel, error) {
 	clean := TextLabel{Size: t.Size, Align: t.Align}
 	for i, l := range t.Lines {
 		l = strings.TrimSpace(strings.Map(func(r rune) rune {
