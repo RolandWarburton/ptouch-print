@@ -81,8 +81,13 @@ Checked 2026-11-25 with 24 mm laminated tape: 100 status requests and one 31 mm 
 - The job sent in 3200-byte chunks prints as Go's single write did. The picture's top is
   pin 0, and its first row is the label's left end.
 - Text, a barcode and a PNG drawn by the server printed right.
-- Not tried: 12 mm tape, long labels, errors, Editor Lite, the printer's sleep, replugging
-  by hand.
+- Editor Lite shows as `04f9:2064` and the printer comes back by itself afterwards.
+- **Open:** by hand, twice, fewer disconnections were logged than were made (one for three
+  unplugs and a power-off, then two), so some reconnections may be missed. It did recover
+  after each one logged. Why isn't known: software cuts don't show it.
+- **Open:** opening the cover and taking the tape out showed no change of status, polled
+  every second. The error bits come from Brother's reference; none has been seen.
+- Not tried: 12 mm tape, long labels, the printer's sleep.
 
 ## LabelWriter 450 (start here)
 
