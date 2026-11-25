@@ -92,6 +92,6 @@ void board_run(const driver_t *d)
             usb_printer_gone(POLL_MS);
         }
         usb_printer_release();
-        report(CODE_NOT_CONNECTED, "unplugged");
+        report(CODE_NOT_CONNECTED, "no printer on the USB port");
     }
 }

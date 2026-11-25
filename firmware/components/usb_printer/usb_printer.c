@@ -237,12 +237,15 @@ const usb_printer_t *usb_printer_wait(int timeout_ms)
     TickType_t left = pdMS_TO_TICKS(timeout_ms);
     vTaskSetTimeOutState(&start);
     do {
-        handle_event(left);
+        bool changed = handle_event(left);
         if (s.gone) {
             usb_printer_release();
         }
         if (s.claimed) {
             return &s.printer;
+        }
+        if (changed) {
+            return NULL;
         }
     } while (xTaskCheckForTimeOut(&start, &left) == pdFALSE);
     return NULL;

@@ -23,8 +23,8 @@ typedef struct {
 // Starts the USB host. Call once.
 void usb_printer_start(const usb_id_t *ids, size_t n);
 
-// Waits for one of the app's printers to be plugged in and claims it, or returns
-// NULL when the time is up. Call usb_printer_release when done with it.
+// Waits for one of the app's printers to be plugged in and claims it. Returns NULL
+// when the time is up, or something else was plugged in or unplugged. Call usb_printer_release when done with it.
 const usb_printer_t *usb_printer_wait(int timeout_ms);
 
 // Whether the claimed printer has gone, waiting up to wait_ms for it to.
