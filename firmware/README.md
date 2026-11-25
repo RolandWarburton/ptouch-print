@@ -7,7 +7,7 @@ Every device type has its own firmware, built from shared components.
 |---|---|---|
 | `apps/lw450` | DYMO LabelWriter 450 | prints; not polling the server yet |
 | `apps/lw550` | DYMO LabelWriter 550 (not tried), 550 Turbo | prints; not polling the server yet |
-| `apps/ptp700` | Brother PT-P700 | a probe that prints nothing |
+| `apps/ptp700` | Brother PT-P700 | prints a test label; not polling the server yet |
 
 `components/` knows no printer: `usb_printer` finds the printer and runs transfers,
 `label` draws, and `board` is what every board does with its app's driver. What
@@ -20,8 +20,8 @@ make flash APP=lw550 PORT=/dev/ttyACM0      # the board's UART port
 make monitor APP=lw550
 ```
 
-The LabelWriter apps print a sample label only if you press `t` (text) or `b`
-(barcode) in the monitor within 30 s of the printer being found.
+The apps print a sample label only if you press `t` (text), or on a LabelWriter `b`
+(barcode), in the monitor within 30 s of the printer being found.
 
 Plug the printer into the board's other USB-C port (the native USB one, GPIO19/20)
 and give that port 5 V. Logs go to the UART port. `docs/printing-notes.md` has the

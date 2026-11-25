@@ -8,6 +8,8 @@
 #define CODE_NO_REPLY "no_reply"
 #define CODE_PRINT_FAILED "print_failed" // the printer reported an error after the job was sent
 #define CODE_PRINTER_ERROR "printer_error"
+#define CODE_TAPE_MISMATCH "tape_mismatch"
 #define CODE_UNCONFIRMED "unconfirmed" // may have printed
 #define CODE_UNSUPPORTED_MEDIA "unsupported_media"
+#define CODE_UNSUPPORTED_TAPE "unsupported_tape"
 #define CODE_WRONG_MEDIA "wrong_media"

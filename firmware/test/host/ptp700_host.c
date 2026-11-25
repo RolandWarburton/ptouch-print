@@ -8,6 +8,33 @@
 
 #include "ptp700_proto.h"
 
+// Encodes a golden picture and compares the job with the Go driver's.
+static void check_job(const char *name, int mm, uint8_t media_type, int lines)
+{
+    static uint8_t rows[8192], want[8192], got[8192];
+    char path[128];
+    snprintf(path, sizeof path, "test/golden/ptp700/%s.rows", name);
+    FILE *f = fopen(path, "rb");
+    assert(f);
+    const pt_tape_t *tape = pt_tape(mm);
+    const size_t row_bytes = (tape->dots + 7) / 8;
+    assert(fread(rows, 1, sizeof rows, f) == lines * row_bytes);
+    fclose(f);
+    snprintf(path, sizeof path, "test/golden/ptp700/%s.job", name);
+    f = fopen(path, "rb");
+    assert(f);
+    size_t n = fread(want, 1, sizeof want, f);
+    fclose(f);
+
+    pt_job_header(got, tape, media_type, lines);
+    size_t len = PT_HEADER_LEN;
+    for (int i = 0; i < lines; i++, len += PT_LINE_LEN) {
+        pt_job_line(got + len, tape, rows + i * row_bytes);
+    }
+    got[len++] = PT_PRINT;
+    assert(len == n && !memcmp(got, want, n));
+}
+
 int main(void)
 {
     uint8_t b[32] = {0x80, [10] = 24, [11] = 1};
@@ -53,6 +80,15 @@ int main(void)
     }
     assert(!memcmp(r + 100, "\x1b\x40\x1b\x69\x53", 5));
 
-    puts("ptp700: status parsing matches the Go driver");
+    check_job("media1-tape12-black-1", 12, 1, 1);
+    check_job("media1-tape12-diagonal-9", 12, 1, 9);
+    check_job("media1-tape24-black-1", 24, 1, 1);
+    check_job("media1-tape24-blank-1", 24, 1, 1);
+    check_job("media1-tape24-diagonal-9", 24, 1, 9);
+    check_job("media1-tape24-noise-300", 24, 1, 300);
+    check_job("media3-tape12-noise-300", 12, 3, 300);
+    assert(!pt_tape(18));
+
+    puts("ptp700: status parsing and print jobs match the Go driver");
     return 0;
 }

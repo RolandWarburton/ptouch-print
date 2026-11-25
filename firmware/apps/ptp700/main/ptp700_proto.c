@@ -45,3 +45,43 @@ void pt_errors(const pt_status_t *s, char *out, size_t cap)
     add(out, cap, error1, sizeof error1 / sizeof error1[0], s->e1);
     add(out, cap, error2, sizeof error2 / sizeof error2[0], s->e2);
 }
+
+static const pt_tape_t tapes[] = {{12, 70, 29}, {24, 128, 0}};
+
+const pt_tape_t *pt_tape(uint8_t mm)
+{
+    for (size_t i = 0; i < sizeof tapes / sizeof tapes[0]; i++) {
+        if (tapes[i].mm == mm) {
+            return &tapes[i];
+        }
+    }
+    return NULL;
+}
+
+void pt_job_header(uint8_t out[PT_HEADER_LEN], const pt_tape_t *tape, uint8_t media_type, uint32_t lines)
+{
+    const uint8_t h[PT_HEADER_LEN] = {
+        0x1b, 0x69, 0x61, 0x01, // raster mode
+        // Print information: without it the printer assumes a default tape and
+        // fails with "replace media". Flags: recover | width valid | media valid.
+        0x1b, 0x69, 0x7a, 0x86, media_type, tape->mm, 0x00, lines, lines >> 8, lines >> 16, lines >> 24, 0x00, 0x00,
+        0x1b, 0x69, 0x4d, 0x40, // auto cut
+        0x4d, 0x02,             // TIFF (packbits) compression
+    };
+    memcpy(out, h, sizeof h);
+}
+
+void pt_job_line(uint8_t out[PT_LINE_LEN], const pt_tape_t *tape, const uint8_t *row)
+{
+    // One packbits literal run: header 15 means "the next 16 bytes as they are".
+    memset(out, 0, PT_LINE_LEN);
+    out[0] = 'G';
+    out[1] = 17;
+    out[3] = 15;
+    for (int y = 0; y < tape->dots; y++) {
+        if (row[y / 8] & (0x80 >> (y % 8))) {
+            int pin = tape->margin + y;
+            out[4 + pin / 8] |= 0x80 >> (pin % 8);
+        }
+    }
+}
