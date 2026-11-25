@@ -1,0 +1,9 @@
+key,type,encoding,value
+board,namespace,,
+server,data,string,https://ptouch.example.com
+token,data,string,the board's token from: ptouch-command-server token -printer NAME
+ssid1,data,string,the Wi-Fi network to prefer
+pass1,data,string,its password
+ssid2,data,string,the one to fall back to
+pass2,data,string,its password
+media,data,string,large-address

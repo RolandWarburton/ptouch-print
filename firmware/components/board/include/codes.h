@@ -4,6 +4,7 @@
 
 #define CODE_OK "" // not sent
 
+#define CODE_BAD_REQUEST "bad_request"
 #define CODE_BUSY "busy"
 #define CODE_EDITOR_LITE "editor_lite"
 #define CODE_NOT_CONNECTED "not_connected"

@@ -8,3 +8,7 @@ dependencies.lock
 # Local agent instructions.
 CLAUDE.md
 test/out/
+
+# The boards' settings: Wi-Fi passwords and tokens.
+settings*.csv
+!settings.example.csv

@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "media.h"
-#include "sdkconfig.h"
+#include "settings.h"
 #include "usb_io.h"
 
 static const char *TAG = "dymo450";
@@ -64,7 +64,7 @@ static const char *loaded(const media_t **media)
         snprintf(s_err, sizeof s_err, "printer status 0x%02x is not idle (0x%02x)", status, STATUS_IDLE);
         return CODE_PRINTER_ERROR;
     }
-    *media = media_find(CONFIG_DYMO_MEDIA_ID);
+    *media = media_find(settings()->media);
     return *media ? CODE_OK : fail(CODE_UNSUPPORTED_MEDIA, "the label stock in the settings isn't in the media table");
 }
 

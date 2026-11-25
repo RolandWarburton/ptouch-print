@@ -87,9 +87,10 @@ Each device type has its own firmware in `apps/`, made of a driver and the share
 - `diecut`: the LabelWriters' media table and lookup. Plain C.
 - `usb_printer`: finds the app's printer by its USB ids; `usb_io` runs one bulk
   transfer with a timeout.
-- `board`: calls the app's `driver_t`. Still only prints samples; to come are
-  settings (Wi-Fi credentials, server URL, board token and media id, from NVS and
-  never built in), joining the network and the poll loop over HTTPS.
+- `board`: calls the app's `driver_t`. `settings` reads Wi-Fi credentials, server URL,
+  board token and media id from NVS (never built in), `net` joins the networks and gets
+  the time, `poller` asks for jobs over HTTPS and reports them, and `board` is the loop.
+  `proto` is the parts of it in plain C.
 
 `apps/lw450` and `apps/lw550` have the drivers; `dymo550_proto` is the 550's parsing,
 in plain C.
@@ -100,8 +101,8 @@ result. A job that fails or might have printed is not retried.
 
 ## Order of work
 
-1. Board: media table and stock setting (done), then `config`, `wifi`.
-2. Board: `poller` against a local copy of the server.
+1. Board: media table and stock setting, `settings`, `net` (done).
+2. Board: `poller` against a local copy of the server (done, on a PT-P700).
 3. Server: printers, per-printer state, media-aware refusals, schema, `printer`
    on REST, MCP and the web UI. (Built on the `multiple-printers` branch;
    not deployed or tried with this board yet. `lw550` is refused until step 4.)

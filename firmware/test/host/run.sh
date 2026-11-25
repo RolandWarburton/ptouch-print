@@ -4,6 +4,10 @@ set -e
 cd "$(dirname "$0")/../.."
 mkdir -p test/out
 
+gcc -Wall -Wextra -fsanitize=address,undefined -Icomponents/board/include -o test/out/board_host test/host/board_host.c \
+	components/board/proto.c
+test/out/board_host
+
 gcc -Wall -Wextra -Iapps/lw550/main -Icomponents/diecut/include -o test/out/dymo550_host test/host/dymo550_host.c \
 	apps/lw550/main/dymo550_proto.c components/diecut/media.c
 test/out/dymo550_host

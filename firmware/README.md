@@ -5,9 +5,9 @@ Every device type has its own firmware, built from shared components.
 
 | App | Printers | State |
 |---|---|---|
-| `apps/lw450` | DYMO LabelWriter 450 | to be tried again; not polling the server yet |
-| `apps/lw550` | DYMO LabelWriter 550 (not tried), 550 Turbo | to be tried again; not polling the server yet |
-| `apps/ptp700` | Brother PT-P700 | prints; not polling the server yet |
+| `apps/lw450` | DYMO LabelWriter 450 | not tried since the server draws |
+| `apps/lw550` | DYMO LabelWriter 550 (not tried), 550 Turbo | not tried since the server draws |
+| `apps/ptp700` | Brother PT-P700 | prints the server's jobs |
 
 The server draws the labels; a board prints the rows of dots it gets. `components/`
 has what apps share: `usb_printer` finds the printer and runs transfers, `board` is
@@ -28,4 +28,17 @@ Plug the printer into the board's other USB-C port (the native USB one, GPIO19/2
 and give that port 5 V. Logs go to the UART port. `docs/printing-notes.md` has the
 protocols and wiring, `docs/design.md` the design.
 
-Never build secrets in: the Wi-Fi password and the board's token belong in NVS.
+## Settings
+
+A board needs its server, token and Wi-Fi networks, in order of preference. Copy
+`settings.example.csv` to `settings.<board>.csv` (gitignored), fill it in, and:
+
+```sh
+make settings SETTINGS=settings.ptp700.csv   # replaces all the board's settings
+```
+
+They are kept in the board's flash, unencrypted, and survive flashing firmware. Never
+build them in. The server must be `https://`.
+
+A board asks for a job every 15 s. While it is on a later network it looks for an earlier
+one every minute, and if it can't reach the server for 5 minutes it tries another.
