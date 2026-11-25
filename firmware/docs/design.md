@@ -38,7 +38,7 @@ loaded media comes from, in order of trust:
    reports the label SKU from its NFC tag);
 2. the board's configuration, for printers that can't (the LW450).
 
-Orientation defaults to `portrait`. Media the server doesn't know is the problem
+Orientation defaults to `portrait`, and to `landscape` for a LabelWriter over MCP and in the web UI. Media the server doesn't know is the problem
 `unsupported_media`.
 
 The board sends the media id on every poll. The server refuses jobs that

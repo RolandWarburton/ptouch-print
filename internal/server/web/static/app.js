@@ -18,7 +18,7 @@ const state = {
   extra: null, // the open job when it isn't among the newest
   size: 'large', // a text label's size and alignment
   align: 'left',
-  orientation: 'portrait', // LabelWriter only
+  orientation: 'landscape', // LabelWriter only
 };
 
 // The chosen printer's status, or {} before the first load.

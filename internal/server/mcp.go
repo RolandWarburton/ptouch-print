@@ -14,13 +14,13 @@ const mcpVersion = "0.3.0"
 
 type printArgs struct {
 	Printer     string `json:"printer,omitempty" jsonschema:"Which printer, by its name in printer_status. May be left out when there is only one."`
-	Orientation string `json:"orientation,omitempty" jsonschema:"LabelWriter only: portrait (default; the label's short side is the barcode's width) or landscape"`
+	Orientation string `json:"orientation,omitempty" jsonschema:"LabelWriter only: landscape (default; along the label's long side) or portrait (the label's short side is the barcode's width)"`
 	Text        string `json:"text" jsonschema:"What the barcode encodes, usually an asset tag such as TG17573. Printable ASCII, at most 80 characters; it's also printed under the barcode."`
 }
 
 type textArgs struct {
 	Printer     string   `json:"printer,omitempty" jsonschema:"Which printer, by its name in printer_status. May be left out when there is only one."`
-	Orientation string   `json:"orientation,omitempty" jsonschema:"LabelWriter only: portrait (default; the label's short side is the text's width) or landscape"`
+	Orientation string   `json:"orientation,omitempty" jsonschema:"LabelWriter only: landscape (default; along the label's long side) or portrait (the label's short side is the text's width)"`
 	Lines       []string `json:"lines" jsonschema:"The label's text. On a P-touch: one line, or two when 24 mm tape is loaded, at most 15 cm long, in characters the Go Bold font can draw. On a LabelWriter: 1 to 8 lines of printable ASCII, at most 80 characters each, that must fit the label. Newlines and other control characters are removed, and each line is trimmed."`
 	Size        string   `json:"size,omitempty" jsonschema:"large (default), medium or small. On a P-touch, the tallest text that fits the tape, or 75% or 50% of it."`
 	Align       string   `json:"align,omitempty" jsonschema:"left (default), center or right; on a P-touch it only matters with two lines"`
@@ -56,7 +56,7 @@ func NewMCP(svc *Service) *mcp.Server {
 		Name:        "print_barcode",
 		Description: "Queue a barcode label on a printer. Returns the job (status queued) or why it was refused, e.g. the printer is offline.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in printArgs) (*mcp.CallToolResult, any, error) {
-		j, err := svc.Submit(ctx, Submitter(ctx), wire.Job{Printer: in.Printer, Kind: wire.KindBarcode, Orientation: in.Orientation, Text: in.Text})
+		j, err := svc.Submit(ctx, Submitter(ctx), wire.Job{Printer: in.Printer, Kind: wire.KindBarcode, Orientation: svc.mcpOrientation(in.Printer, in.Orientation), Text: in.Text})
 		if err != nil {
 			return errorResult(err)
 		}
@@ -68,7 +68,7 @@ func NewMCP(svc *Service) *mcp.Server {
 		Description: "Queue a text label on a printer. Returns the job (status queued) or why it was refused, e.g. the printer is offline or two lines on 12 mm tape.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in textArgs) (*mcp.CallToolResult, any, error) {
 		j, err := svc.Submit(ctx, Submitter(ctx), wire.Job{
-			Printer: in.Printer, Kind: wire.KindText, Orientation: in.Orientation, Lines: in.Lines, Size: in.Size, Align: in.Align,
+			Printer: in.Printer, Kind: wire.KindText, Orientation: svc.mcpOrientation(in.Printer, in.Orientation), Lines: in.Lines, Size: in.Size, Align: in.Align,
 		})
 		if err != nil {
 			return errorResult(err)
@@ -114,6 +114,19 @@ func NewMCP(svc *Service) *mcp.Server {
 		return jsonResult(jobs)
 	})
 	return server
+}
+
+// mcpOrientation is the orientation for a print tool call: landscape on a LabelWriter
+// unless the call says otherwise. A P-touch has none, and a bad printer name is left
+// for Submit to refuse.
+func (s *Service) mcpOrientation(printer, orientation string) string {
+	if orientation != "" {
+		return orientation
+	}
+	if p, err := s.printer(printer); err == nil && p.Family != wire.FamilyPTP700 {
+		return wire.OrientLandscape
+	}
+	return ""
 }
 
 func textResult(s string) *mcp.CallToolResult {

@@ -294,6 +294,13 @@ func TestMCPPrinters(t *testing.T) {
 		"orientation": "landscape"}); !strings.Contains(body, `\"printer\":\"office-dymo\"`) || !strings.Contains(body, `\"orientation\":\"landscape\"`) {
 		t.Errorf("print_text: %s", body)
 	}
+	if _, body := rpc(t, e.url, clientToken, "print_barcode", map[string]any{"text": "A", "printer": "office-dymo"}); !strings.Contains(body, `\"orientation\":\"landscape\"`) {
+		t.Errorf("a LabelWriter's default orientation over MCP: %s", body)
+	}
+	if _, body := rpc(t, e.url, clientToken, "print_barcode", map[string]any{"text": "A", "printer": "ptouch"}); strings.Contains(body, "orientation") ||
+		!strings.Contains(body, `\"printer\":\"ptouch\"`) {
+		t.Errorf("a P-touch over MCP: %s", body)
+	}
 	if _, body := rpc(t, e.url, clientToken, "printer_status", map[string]any{}); !strings.Contains(body, `\"name\":\"ptouch\"`) ||
 		!strings.Contains(body, `\"name\":\"office-dymo\"`) {
 		t.Errorf("printer_status: %s", body)
