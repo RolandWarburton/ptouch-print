@@ -52,7 +52,7 @@ type Job struct {
 }
 
 // FirstPrinter is the printer that jobs from before there could be several
-// belong to. The server gives it to PTOUCH_BOARD_TOKEN_SHA256's printer too.
+// belong to.
 const FirstPrinter = "ptouch"
 
 type Store struct{ db *sql.DB }

@@ -1,7 +1,7 @@
 // Command sample draws a text label as the server does and writes its rows, for
 // an app to build in as its sample:
 //
-//	go run ./firmware/tools/sample -family ptouch -media tape-24 "ESP32 OK" "PT-P700" > firmware/apps/ptp700/main/sample.rows
+//	go run ./firmware/tools/sample -family pt-p700 -media tape-24 "ESP32 OK" "PT-P700" > firmware/apps/ptp700/main/sample.rows
 package main
 
 import (

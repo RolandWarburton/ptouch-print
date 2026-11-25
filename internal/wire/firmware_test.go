@@ -94,7 +94,7 @@ func TestFirmwareTapes(t *testing.T) {
 	}
 	for _, r := range rows {
 		n := func(s string) int { i, _ := strconv.Atoi(s); return i }
-		m, ok := FindMedia(FamilyPTouch, r[1])
+		m, ok := FindMedia(FamilyPTP700, r[1])
 		spec := tapes[n(r[2])]
 		if !ok || m.TapeMM != spec.MM || spec.Dots != n(r[3]) || spec.Margin != n(r[4]) {
 			t.Errorf("the firmware has %v, want %+v", r[0], spec)

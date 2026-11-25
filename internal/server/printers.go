@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RolandWarburton/ptouch-print/internal/store"
 	"github.com/RolandWarburton/ptouch-print/internal/wire"
 )
 
@@ -36,12 +35,8 @@ func NewPrinter(name, family, tokenHash string) (Printer, error) {
 }
 
 // ParsePrinters reads "name:family:sha256,name:family:sha256", in the order
-// they're shown. boardHash, if set, is the token of a P-touch called "ptouch",
-// which comes first: the setting from before there could be several printers.
-func ParsePrinters(list, boardHash string) ([]Printer, error) {
-	if boardHash != "" {
-		list = store.FirstPrinter + ":" + wire.FamilyPTouch + ":" + boardHash + "," + list
-	}
+// they're shown.
+func ParsePrinters(list string) ([]Printer, error) {
 	var printers []Printer
 	names, hashes := map[string]bool{}, map[string]bool{}
 	for entry := range strings.SplitSeq(list, ",") {
@@ -109,7 +104,7 @@ var lwProblems = map[string]string{
 const codeNotReady = "printer_not_ready" // the board gave no reason
 
 func fix(family, problem string) string {
-	if family != wire.FamilyPTouch {
+	if family != wire.FamilyPTP700 {
 		if msg, ok := lwProblems[problem]; ok {
 			return msg
 		}

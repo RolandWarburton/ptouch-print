@@ -53,7 +53,7 @@ func TestDieCutMatchesFirmware(t *testing.T) {
 }
 
 func TestDrawTape(t *testing.T) {
-	m, _ := wire.FindMedia(wire.FamilyPTouch, "tape-12")
+	m, _ := wire.FindMedia(wire.FamilyPTP700, "tape-12")
 	img := image.NewNRGBA(image.Rect(0, 0, 3, 70)) // transparent
 	img.Set(0, 0, color.Black)
 	img.Set(1, 9, color.Gray{0x40})
@@ -92,7 +92,7 @@ func TestDrawTape(t *testing.T) {
 }
 
 func TestDrawRefuses(t *testing.T) {
-	tape, _ := wire.FindMedia(wire.FamilyPTouch, "tape-24")
+	tape, _ := wire.FindMedia(wire.FamilyPTP700, "tape-24")
 	labels, _ := wire.FindMedia(wire.FamilyLW450, "large-address")
 	pngOf := func(w, h int) []byte {
 		var b bytes.Buffer

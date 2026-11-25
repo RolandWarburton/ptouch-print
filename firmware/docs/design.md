@@ -10,7 +10,7 @@ A printer is a named target the server knows about:
 | field | meaning |
 |---|---|
 | `name` | what jobs address it by, e.g. `office-dymo` |
-| `family` | `ptouch`, `lw450` or `lw550`; decides which label kinds and options apply |
+| `family` | `pt-p700`, `lw450` or `lw550`; decides which label kinds and options apply |
 | token | SHA-256 of the board's token; the token identifies the printer, so a board can only fetch and report its own jobs |
 
 Configured as `PRINT_PRINTERS=name:family:sha256,...`.

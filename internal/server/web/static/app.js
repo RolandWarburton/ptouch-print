@@ -27,7 +27,7 @@ function chosen() {
 }
 
 function isTape(p) {
-  return p.family === 'ptouch';
+  return p.family === 'pt-p700';
 }
 
 // --- API -------------------------------------------------------------------

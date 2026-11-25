@@ -219,7 +219,7 @@ func TestWebUINeedsDexAndSecret(t *testing.T) {
 		"no Dex":    {WebUI: true, WebSecret: webSecret},
 		"no secret": {WebUI: true, Dex: dex},
 	} {
-		svc := NewService(nil, []Printer{{"ptouch", "ptouch", HashToken(boardToken)}}, log)
+		svc := NewService(nil, []Printer{{"ptouch", "pt-p700", HashToken(boardToken)}}, log)
 		if _, err := NewHandler(svc, opts, log); err == nil {
 			t.Errorf("%s: started", name)
 		}

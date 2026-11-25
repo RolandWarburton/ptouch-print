@@ -16,7 +16,7 @@ const dymoToken = "dymo-secret"
 func newTwoPrinters(t *testing.T) *env {
 	t.Helper()
 	return newEnvPrinters(t, Options{},
-		Printer{"ptouch", wire.FamilyPTouch, HashToken(boardToken)},
+		Printer{"ptouch", wire.FamilyPTP700, HashToken(boardToken)},
 		Printer{"office-dymo", wire.FamilyLW450, HashToken(dymoToken)})
 }
 
@@ -175,7 +175,7 @@ func TestStatusPerPrinter(t *testing.T) {
 		return all[0].(map[string]any), all[1].(map[string]any)
 	}
 	p, d := printers()
-	if p["name"] != "ptouch" || p["family"] != "ptouch" || p["media"] != "tape-24" || p["tape_mm"] != 24.0 ||
+	if p["name"] != "ptouch" || p["family"] != "pt-p700" || p["media"] != "tape-24" || p["tape_mm"] != 24.0 ||
 		p["height_dots"] != 128.0 || p["width_dots"] != nil || p["wifi"] != "Home" {
 		t.Errorf("ptouch %v", p)
 	}
@@ -306,19 +306,16 @@ func TestMCPPrinters(t *testing.T) {
 
 func TestParsePrinters(t *testing.T) {
 	x, y := HashToken("x"), HashToken("y")
-	got, err := ParsePrinters(" office-dymo:lw450:"+strings.ToUpper(y)+", ", x)
-	if want := []Printer{{"ptouch", "ptouch", x}, {"office-dymo", "lw450", y}}; err != nil || fmt.Sprint(got) != fmt.Sprint(want) {
+	got, err := ParsePrinters(" office-dymo:lw450:" + strings.ToUpper(y) + ", ,office-p700:pt-p700:" + x)
+	if want := []Printer{{"office-dymo", "lw450", y}, {"office-p700", "pt-p700", x}}; err != nil || fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("%v %v", got, err)
 	}
 	for _, bad := range []string{
 		"a:lw450", "a:lw450:abc", ":lw450:" + x, "a:lw650:" + x, "Office Dymo:lw450:" + x,
-		"a:lw450:" + x + ",a:ptouch:" + y, "a:lw450:" + x + ",b:ptouch:" + x,
+		"a:lw450:" + x + ",a:pt-p700:" + y, "a:lw450:" + x + ",b:pt-p700:" + x, "a:ptouch:" + x,
 	} {
-		if _, err := ParsePrinters(bad, ""); err == nil {
+		if _, err := ParsePrinters(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
-	}
-	if _, err := ParsePrinters("ptouch:ptouch:"+y, x); err == nil {
-		t.Error("ptouch configured in both settings accepted")
 	}
 }

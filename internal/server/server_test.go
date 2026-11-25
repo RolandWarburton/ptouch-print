@@ -41,7 +41,7 @@ func newEnv(t *testing.T, dex *DexConfig) *env {
 // newEnvWith is newEnv with more options; the tokens are always the test ones.
 func newEnvWith(t *testing.T, opts Options) *env {
 	t.Helper()
-	return newEnvPrinters(t, opts, Printer{"ptouch", wire.FamilyPTouch, HashToken(boardToken)})
+	return newEnvPrinters(t, opts, Printer{"ptouch", wire.FamilyPTP700, HashToken(boardToken)})
 }
 
 func newEnvPrinters(t *testing.T, opts Options, printers ...Printer) *env {

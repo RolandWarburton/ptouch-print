@@ -78,7 +78,7 @@ func (s *Service) Next(ctx context.Context, printer string, poll Poll) (*wire.Jo
 			switch {
 			case poll.Media == "":
 				problem = codeNotReady // a board too old to say why
-			case p.Family == wire.FamilyPTouch:
+			case p.Family == wire.FamilyPTP700:
 				problem = wire.CodeUnsupportedTape
 			default:
 				problem = wire.CodeUnsupportedMedia
@@ -184,7 +184,7 @@ func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.J
 		if size, err = png.DecodeConfig(bytes.NewReader(req.Image)); err != nil {
 			return store.Job{}, refuse(http.StatusBadRequest, "bad_image", "image must be a PNG")
 		}
-		if p.Family == wire.FamilyPTouch && req.TapeMM <= 0 {
+		if p.Family == wire.FamilyPTP700 && req.TapeMM <= 0 {
 			return store.Job{}, refuse(http.StatusBadRequest, "bad_request", "tape_mm is required for an image")
 		}
 		job.Image, job.TapeMM = req.Image, req.TapeMM
@@ -194,7 +194,7 @@ func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.J
 	if job.Orientation, err = orientation(p.Family, req); err != nil {
 		return store.Job{}, err
 	}
-	if p.Family != wire.FamilyPTouch && req.TapeMM != 0 {
+	if p.Family != wire.FamilyPTP700 && req.TapeMM != 0 {
 		return store.Job{}, refuse(http.StatusBadRequest, "bad_request", "%s doesn't take tape; leave out tape_mm", p.Name)
 	}
 
@@ -212,13 +212,13 @@ func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.J
 		return store.Job{}, refuse(http.StatusConflict, wire.CodeWrongMedia,
 			"the job is for %s but %s has %s loaded", job.Media, p.Name, st.Media)
 	}
-	if p.Family != wire.FamilyPTouch {
+	if p.Family != wire.FamilyPTP700 {
 		job.Media = st.Media // so the board can refuse it if the labels are changed meanwhile
 	}
 	switch job.Kind {
 	case wire.KindText:
 		t := label.TextLabel{Lines: job.Lines, Size: job.Size, Align: job.Align}
-		if p.Family == wire.FamilyPTouch {
+		if p.Family == wire.FamilyPTP700 {
 			t, err = label.CheckText(t, st.TapeMM)
 		} else {
 			t, err = label.CheckDieCutText(t)
@@ -265,7 +265,7 @@ func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.J
 // orientation checks a job's orientation, which only text and barcodes on a
 // LabelWriter have, and gives it its default.
 func orientation(family string, req wire.Job) (string, error) {
-	if family == wire.FamilyPTouch || req.Kind == wire.KindImage {
+	if family == wire.FamilyPTP700 || req.Kind == wire.KindImage {
 		if req.Orientation != "" {
 			return "", refuse(http.StatusBadRequest, "bad_request", "orientation is only for text and barcodes on a LabelWriter")
 		}

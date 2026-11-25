@@ -32,10 +32,8 @@ Usage:
   ptouch-command-server help                       show this
 
 Serving is configured from the environment:
-  PRINT_PRINTERS             name:family:hash,name:family:hash for the printers (from "token -printer NAME");
-                             the family is ptouch, lw450 or lw550
-  PTOUCH_BOARD_TOKEN_SHA256  hash of the board's token for a P-touch called "ptouch", from before there could be
-                             several printers; same as ptouch:ptouch:hash in PRINT_PRINTERS. One of the two is required
+  PRINT_PRINTERS             name:family:hash,name:family:hash for the printers (from "token -printer NAME"), required;
+                             the family is pt-p700, lw450 or lw550
   PRINT_CLIENT_TOKENS        name:hash,name:hash for REST/MCP clients (from "token -client NAME")
   PRINT_DB                   database path, same as -db (default /data/ptouch.sqlite)
 
@@ -91,7 +89,7 @@ func main() {
 }
 
 func serve(log *slog.Logger, addr, dbPath string) error {
-	printers, err := server.ParsePrinters(os.Getenv("PRINT_PRINTERS"), os.Getenv("PTOUCH_BOARD_TOKEN_SHA256"))
+	printers, err := server.ParsePrinters(os.Getenv("PRINT_PRINTERS"))
 	if err != nil {
 		return fmt.Errorf("PRINT_PRINTERS: %w", err)
 	}
@@ -146,7 +144,7 @@ func token(args []string) {
 	fs := flag.NewFlagSet("token", flag.ExitOnError)
 	client := fs.String("client", "", "name of a REST/MCP client")
 	printer := fs.String("printer", "", "name of a printer, for its board's token")
-	family := fs.String("family", wire.FamilyPTouch, "the printer's family: ptouch, lw450 or lw550")
+	family := fs.String("family", wire.FamilyPTP700, "the printer's family: pt-p700, lw450 or lw550")
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), "Usage: ptouch-command-server token -printer NAME [-family FAMILY] | -client NAME\n\n"+
 			"Makes a random token and prints it with its hash. The token goes to the board or client;\n"+

@@ -83,13 +83,13 @@ func Tape(mm int) (TapeSpec, bool) {
 
 // Printer families: they decide which media, label kinds and options apply.
 const (
-	FamilyPTouch = "ptouch"
+	FamilyPTP700 = "pt-p700"
 	FamilyLW450  = "lw450"
 	FamilyLW550  = "lw550"
 )
 
 // Families is every family.
-var Families = []string{FamilyPTouch, FamilyLW450, FamilyLW550}
+var Families = []string{FamilyPTP700, FamilyLW450, FamilyLW550}
 
 // Media is one kind of label stock. Width and Length are the printable dots
 // across the head and along the feed; Length is 0 for tape, which is cut to fit
@@ -106,8 +106,8 @@ type Media struct {
 }
 
 var media = []Media{
-	{ID: "tape-12", Name: "12 mm tape", Family: FamilyPTouch, TapeMM: 12, Width: tapes[12].Dots},
-	{ID: "tape-24", Name: "24 mm tape", Family: FamilyPTouch, TapeMM: 24, Width: tapes[24].Dots},
+	{ID: "tape-12", Name: "12 mm tape", Family: FamilyPTP700, TapeMM: 12, Width: tapes[12].Dots},
+	{ID: "tape-24", Name: "24 mm tape", Family: FamilyPTP700, TapeMM: 24, Width: tapes[24].Dots},
 	{ID: "large-address", Name: "DYMO Large Address S0722400", Family: FamilyLW450, Width: 400, Length: 950, Pitch: 1050},
 	{ID: "large-address", Name: "DYMO Large Address S0722400", Family: FamilyLW550, Width: 400, Length: 950, Pitch: 1050},
 }

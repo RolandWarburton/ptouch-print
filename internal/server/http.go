@@ -43,7 +43,7 @@ type Options struct {
 // then accepts a signed-in browser's session cookie too.
 func NewHandler(svc *Service, opts Options, log *slog.Logger) (http.Handler, error) {
 	if len(svc.printers) == 0 {
-		return nil, errors.New("no printers: set PRINT_PRINTERS or PTOUCH_BOARD_TOKEN_SHA256 (see ptouch-command-server token)")
+		return nil, errors.New("no printers: set PRINT_PRINTERS (see ptouch-command-server token)")
 	}
 	board := svc.boardTokens()
 	client := clientAuth{tokens: opts.ClientTokens}
