@@ -80,6 +80,10 @@ make settings SETTINGS=settings.office-dymo.toml PORT=/dev/ttyACM0
 That replaces all the board's settings. They survive flashing firmware. Afterwards delete
 the file, or keep it somewhere safe: the board can't show you its settings.
 
+The firmware and the settings are written separately, to different parts of the board's
+flash. A new board needs both, once. After that, new firmware needs only `make flash`, and
+changed settings need only `make settings`.
+
 ## 4. Connect the printer and check
 
 Plug the printer into the **native** port and switch it on. A PT-P700's Editor Lite light
