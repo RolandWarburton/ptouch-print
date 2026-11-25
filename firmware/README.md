@@ -28,16 +28,12 @@ Plug the printer into the board's other USB-C port (the native USB one, GPIO19/2
 and give that port 5 V. Logs go to the UART port. `docs/printing-notes.md` has the
 protocols and wiring, `docs/design.md` the design.
 
-## Settings
+## Setting up a board
 
-A board needs its server, token and Wi-Fi networks, in order of preference. Copy
-`settings.example.csv` to `settings.<board>.csv` (gitignored), fill it in, and:
+See [docs/setup-board.md](docs/setup-board.md). In short: `make flash APP=...`, then
+`make settings SETTINGS=settings.<board>.csv`, from a copy of `settings.example.csv`.
 
-```sh
-make settings SETTINGS=settings.ptp700.csv   # replaces all the board's settings
-```
-
-They are kept in the board's flash, unencrypted, and survive flashing firmware. Never
+The settings are kept in the board's flash, unencrypted, and survive flashing firmware. Never
 build them in. The server must be `https://`.
 
 A board asks for a job every 15 s. While it is on a later network it looks for an earlier

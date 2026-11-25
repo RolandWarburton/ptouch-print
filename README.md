@@ -7,8 +7,7 @@ LabelWriters.
 ([`firmware/`](firmware/README.md)) that asks the server for its labels, so all of a
 board's traffic is outgoing.
 
-> The boards' firmware doesn't talk to the server yet. The Raspberry Pi board it
-> replaces is last in commit `6b5b34f`.
+> The Raspberry Pi board this replaces is last in commit `6b5b34f`.
 
 Text, barcodes and PNGs, on 12 mm and 24 mm tape and on LabelWriter labels. A job names
 its printer when the server has more than one.
@@ -59,6 +58,8 @@ The wiki covers the rest:
 
 - [Deploy the command server](https://github.com/RolandWarburton/ptouch-print/wiki/Deploy-the-command-server),
   including the claude.ai connector
+- [Set up a board](https://github.com/RolandWarburton/ptouch-print/wiki/Set-up-a-board): flashing it,
+  its Wi-Fi and token, and what to do when it doesn't work
 - [Tokens](https://github.com/RolandWarburton/ptouch-print/wiki/Tokens): the board token, named client
   tokens and Dex sign-in, and how to make, revoke and replace them
 - [Using the API](https://github.com/RolandWarburton/ptouch-print/wiki/Using-the-API): job states, PNG

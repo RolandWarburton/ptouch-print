@@ -105,6 +105,6 @@ result. A job that fails or might have printed is not retried.
 2. Board: `poller` against a local copy of the server (done, on a PT-P700).
 3. Server: printers, per-printer state, media-aware refusals, schema, `printer`
    on REST, MCP and the web UI. (Built on the `multiple-printers` branch;
-   not deployed or tried with this board yet. `lw550` is refused until step 4.)
-4. LW550 support: lock handshake, status and NFC media. (Board side done in
-   `apps/lw550`; the server still refuses `lw550`.)
+   not deployed yet.)
+4. LW550 support: lock handshake, status and NFC media. (Done in
+   `apps/lw550` and the server; not tried together.)

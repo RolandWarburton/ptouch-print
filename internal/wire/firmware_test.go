@@ -69,20 +69,20 @@ func TestFirmwareMedia(t *testing.T) {
 		n := func(s string) int { i, _ := strconv.Atoi(s); return i }
 		firmware[r[1]] = Media{ID: r[1], Name: r[2], Width: n(r[3]), Length: n(r[4]), Pitch: n(r[5])}
 	}
-	labels := 0
+	labels := map[string]bool{}
 	for _, m := range media {
 		if m.Length == 0 {
 			continue // tape
 		}
-		labels++
+		labels[m.ID] = true
 		got := firmware[m.ID]
 		got.Family = m.Family
 		if got != m {
 			t.Errorf("%s: the firmware has %+v, want %+v", m.ID, got, m)
 		}
 	}
-	if labels == 0 || len(firmware) != labels {
-		t.Errorf("%d kinds of die-cut labels here, %d in the firmware", labels, len(firmware))
+	if len(labels) == 0 || len(firmware) != len(labels) {
+		t.Errorf("%d kinds of die-cut labels here, %d in the firmware", len(labels), len(firmware))
 	}
 }
 

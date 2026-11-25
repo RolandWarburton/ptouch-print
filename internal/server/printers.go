@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,8 +27,8 @@ func NewPrinter(name, family, tokenHash string) (Printer, error) {
 	switch {
 	case !printerName.MatchString(name):
 		return Printer{}, fmt.Errorf("printer name %q must be lower-case letters, digits and dashes, at most 32", name)
-	case family != wire.FamilyPTouch && family != wire.FamilyLW450:
-		return Printer{}, fmt.Errorf("printer %s: family %q must be %s or %s", name, family, wire.FamilyPTouch, wire.FamilyLW450)
+	case !slices.Contains(wire.Families, family):
+		return Printer{}, fmt.Errorf("printer %s: family %q must be one of %s", name, family, strings.Join(wire.Families, ", "))
 	case !validHash(tokenHash):
 		return Printer{}, fmt.Errorf("printer %s: the token hash must be 64 hex characters (see ptouch-command-server token)", name)
 	}
@@ -108,7 +109,7 @@ var lwProblems = map[string]string{
 const codeNotReady = "printer_not_ready" // the board gave no reason
 
 func fix(family, problem string) string {
-	if family == wire.FamilyLW450 {
+	if family != wire.FamilyPTouch {
 		if msg, ok := lwProblems[problem]; ok {
 			return msg
 		}

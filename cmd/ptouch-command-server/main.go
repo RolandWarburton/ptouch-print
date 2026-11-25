@@ -33,7 +33,7 @@ Usage:
 
 Serving is configured from the environment:
   PRINT_PRINTERS             name:family:hash,name:family:hash for the printers (from "token -printer NAME");
-                             the family is ptouch or lw450
+                             the family is ptouch, lw450 or lw550
   PTOUCH_BOARD_TOKEN_SHA256  hash of the board's token for a P-touch called "ptouch", from before there could be
                              several printers; same as ptouch:ptouch:hash in PRINT_PRINTERS. One of the two is required
   PRINT_CLIENT_TOKENS        name:hash,name:hash for REST/MCP clients (from "token -client NAME")
@@ -146,7 +146,7 @@ func token(args []string) {
 	fs := flag.NewFlagSet("token", flag.ExitOnError)
 	client := fs.String("client", "", "name of a REST/MCP client")
 	printer := fs.String("printer", "", "name of a printer, for its board's token")
-	family := fs.String("family", wire.FamilyPTouch, "the printer's family: ptouch or lw450")
+	family := fs.String("family", wire.FamilyPTouch, "the printer's family: ptouch, lw450 or lw550")
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), "Usage: ptouch-command-server token -printer NAME [-family FAMILY] | -client NAME\n\n"+
 			"Makes a random token and prints it with its hash. The token goes to the board or client;\n"+

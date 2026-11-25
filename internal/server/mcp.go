@@ -90,7 +90,7 @@ func NewMCP(svc *Service) *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "printer_status",
 		Description: "The printers, or the one named, and whether each can print now: online (checked in within the last " +
-			"minute), its family (ptouch or lw450), the loaded media, and when it can't print, the problem (e.g. editor_lite, printer_error, not_connected). " +
+			"minute), its family (ptouch, lw450 or lw550), the loaded media, and when it can't print, the problem (e.g. editor_lite, printer_error, not_connected). " +
 			"wifi is the Wi-Fi network the board was on at its last check-in.",
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in statusArgs) (*mcp.CallToolResult, any, error) {
 		if in.Printer == "" {

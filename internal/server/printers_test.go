@@ -134,6 +134,21 @@ func TestDrawnForWhatIsLoaded(t *testing.T) {
 	}
 }
 
+func TestLW550(t *testing.T) {
+	e := newEnvPrinters(t, Options{}, Printer{"desk", wire.FamilyLW550, HashToken(dymoToken)})
+	e.pollDymo("media=&problem=printer_error")
+	if code, body := e.do("POST", "/api/jobs", clientToken, barcodeFor("desk")); code != 503 || !strings.Contains(body["error"].(string), "out of labels") {
+		t.Errorf("with a problem: %d %v", code, body)
+	}
+	e.pollDymo("media=large-address")
+	if code, job := e.do("POST", "/api/jobs", clientToken, barcodeFor("desk")); code != 201 || job["orientation"] != "portrait" {
+		t.Fatalf("submit: %d %v", code, job)
+	}
+	if code, sent := e.pollDymo("media=large-address"); code != 200 || raster(sent)["dots"] != 400.0 || raster(sent)["rows"] != 950.0 {
+		t.Errorf("poll: %d, %v x %v", code, raster(sent)["dots"], raster(sent)["rows"])
+	}
+}
+
 func TestTooLongIsRefusedAtOnce(t *testing.T) {
 	e := newTwoPrinters(t)
 	e.poll("24")
@@ -296,7 +311,7 @@ func TestParsePrinters(t *testing.T) {
 		t.Fatalf("%v %v", got, err)
 	}
 	for _, bad := range []string{
-		"a:lw450", "a:lw450:abc", ":lw450:" + x, "a:lw550:" + x, "Office Dymo:lw450:" + x,
+		"a:lw450", "a:lw450:abc", ":lw450:" + x, "a:lw650:" + x, "Office Dymo:lw450:" + x,
 		"a:lw450:" + x + ",a:ptouch:" + y, "a:lw450:" + x + ",b:ptouch:" + x,
 	} {
 		if _, err := ParsePrinters(bad, ""); err == nil {
