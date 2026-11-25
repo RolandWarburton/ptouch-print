@@ -1,12 +1,16 @@
 # ptouch-print
 
-Prints labels on a Brother PT-P700 P-touch printer from anywhere.
+Prints labels on label printers from anywhere: a Brother PT-P700 P-touch and DYMO
+LabelWriters.
 
-**`ptouch-print-board`** (client) and **`ptouch-command-server`** (control server)
-work as a pull model, the client requests updates intermittently
-allowing for one-way communication.
+**`ptouch-command-server`** queues labels. Each printer has an ESP32 **board**
+([`firmware/`](firmware/README.md)) that asks the server for its labels, so all of a
+board's traffic is outgoing.
 
-It supports 12 mm and 24 mm tape. Text, Barcodes, and PNGs.
+> The Raspberry Pi board this replaces is last in commit `6b5b34f`.
+
+Text, barcodes and PNGs, on 12 mm and 24 mm tape and on LabelWriter labels. A job names
+its printer when the server has more than one.
 
 ```
   MCP client               scripts, curl
@@ -24,26 +28,26 @@ It supports 12 mm and 24 mm tape. Text, Barcodes, and PNGs.
   │                 SQLite (jobs volume) │
   └──────────────────────────────────────┘
                   ▲
-                  │ outgoing HTTPS only (SBC token):
+                  │ outgoing HTTPS only (board token):
                   │   GET  /board/next              every 15 s
                   │   POST /board/jobs/{id}/result
                   │
   ┌──────────────────────────────────────┐
-  │ SBC                                  │
+  │ ESP32-S3 board                       │
   │                                      │
-  │   ptouch-print-board                 │
-  │     draws the barcode, prints it     │
+  │   firmware for its type of printer   │
+  │     prints the label                 │
   └──────────────────┬───────────────────┘
-                     │ USB (/dev/usb/lp0)
+                     │ USB
                      ▼
-               Brother PT-P700
+               label printer
 
   queued ──▶ sent ──▶ done | failed     (never retried)
 ```
 
 **Labels are never reprinted automatically.** A job that fails, or might have
 printed but wasn't confirmed, is abandoned; submit a new one if the label really
-didn't come out. Submits are refused straight away if the SBC hasn't checked in
+didn't come out. Submits are refused straight away if the board hasn't checked in
 for a minute, or if it reports the printer can't print. The refusal names the
 problem and how to fix it, e.g. `editor_lite`: "Hold its Editor Lite button
 until the light goes off."
@@ -54,9 +58,9 @@ The wiki covers the rest:
 
 - [Deploy the command server](https://github.com/RolandWarburton/ptouch-print/wiki/Deploy-the-command-server),
   including the claude.ai connector
-- [Set up the SBC](https://github.com/RolandWarburton/ptouch-print/wiki/Set-up-the-SBC): imaging the
-  Pi, installing and upgrading, and checking it can see the printer
-- [Tokens](https://github.com/RolandWarburton/ptouch-print/wiki/Tokens): the SBC token, named client
+- [Set up a board](https://github.com/RolandWarburton/ptouch-print/wiki/Set-up-a-board): flashing it,
+  its Wi-Fi and token, and what to do when it doesn't work
+- [Tokens](https://github.com/RolandWarburton/ptouch-print/wiki/Tokens): the board token, named client
   tokens and Dex sign-in, and how to make, revoke and replace them
 - [Using the API](https://github.com/RolandWarburton/ptouch-print/wiki/Using-the-API): job states, PNG
   labels and the MCP tools
@@ -73,14 +77,11 @@ curl -H "Authorization: Bearer $TOKEN" -d '{"kind":"barcode","text":"TG17573"}' 
 
 ```sh
 make test     # vet and unit tests
-make build    # both binaries for this machine, in bin/
-make armv6    # bin/ptouch-print-board-linux-armv6 (Pi Zero / Zero W, Pi 1)
-make armv7    # bin/ptouch-print-board-linux-armv7
-make arm64    # bin/ptouch-print-board-linux-arm64
+make build    # the command server for this machine, in bin/
 ```
 
-Both binaries are pure Go (no cgo). The command server's image is built by the
-`Dockerfile`.
+The server is pure Go (no cgo), and its image is built by the `Dockerfile`. The
+firmware has its own Makefile: see [`firmware/`](firmware/README.md).
 
 ## License
 

@@ -9,4 +9,7 @@ bin/
 CLAUDE.md
 
 # Local docs, which may hold private details.
-docs/
+/docs/
+
+# Board configs, which may hold private details.
+config.toml

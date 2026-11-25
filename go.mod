@@ -3,7 +3,6 @@ module github.com/RolandWarburton/ptouch-print
 go 1.26.1
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/boombuler/barcode v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	golang.org/x/image v0.46.0

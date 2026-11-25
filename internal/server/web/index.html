@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ptouch</title>
+<title>label-server</title>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/bundle.css">
 <link rel="stylesheet" href="/static/app.css">
@@ -13,7 +13,7 @@
 <div class="wc page">
   <header class="wc-top">
     <div class="wc-brand">
-      <h1 class="wc-brand-name"><a href="#">ptouch</a></h1>
+      <h1 class="wc-brand-name"><a href="#">label-server</a></h1>
       <span class="wc-brand-sub">label printer</span>
     </div>
     <div class="wc-who" id="who" hidden>
@@ -37,10 +37,11 @@
           <h3 id="printer-h">Printer</h3>
           <span class="wc-state" id="printer-state"></span>
         </div>
+        <span class="wc-seg printers" role="group" aria-label="Printer" id="printer" hidden></span>
         <div class="fix" id="printer-fix" hidden></div>
         <dl class="wc-facts facts-2">
-          <div class="wc-fact"><dt>Tape</dt><dd id="tape"></dd></div>
-          <div class="wc-fact"><dt>Label height</dt><dd id="height"></dd></div>
+          <div class="wc-fact"><dt>Loaded</dt><dd id="media"></dd></div>
+          <div class="wc-fact"><dt>Image size</dt><dd id="image-size"></dd></div>
           <div class="wc-fact"><dt>Checked in</dt><dd><time id="checked"></time></dd></div>
           <div class="wc-fact"><dt>Wi-Fi</dt><dd id="wifi"></dd></div>
         </dl>
@@ -64,7 +65,7 @@
     <section>
       <div class="stack" id="print-pane">
         <form class="wc-card wc-hero" id="print-form" novalidate>
-          <div class="wc-title-row"><h2 class="wc-title">Print a label</h2></div>
+          <div class="wc-title-row"><h2 class="wc-title">Print a label</h2><span class="wc-state" id="print-on" hidden></span></div>
           <span class="wc-seg" role="group" aria-label="Label kind" id="kind">
             <button type="button" aria-pressed="true" data-kind="barcode">Barcode</button>
             <button type="button" aria-pressed="false" data-kind="text">Text</button>
@@ -80,7 +81,12 @@
           </div>
 
           <div class="stack-12" id="text-fields" hidden>
-            <div>
+            <div id="lines-field" hidden>
+              <label class="wc-label" for="lines">Text</label>
+              <textarea class="wc-input" id="lines" rows="5" autocomplete="off"></textarea>
+              <p class="hint">Up to 8 lines. Blank lines are left out.</p>
+            </div>
+            <div id="line1-field">
               <label class="wc-label" for="line1">Line 1</label>
               <input class="wc-input" id="line1" autocomplete="off">
             </div>
@@ -102,6 +108,11 @@
               </span>
             </div>
           </div>
+
+          <span class="wc-seg" role="group" aria-label="Orientation" id="orientation" hidden>
+            <button type="button" aria-pressed="false" data-orientation="portrait">Portrait</button>
+            <button type="button" aria-pressed="true" data-orientation="landscape">Landscape</button>
+          </span>
 
           <div class="stack-12" id="image-fields" hidden>
             <div>

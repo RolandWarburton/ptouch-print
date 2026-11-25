@@ -33,27 +33,37 @@ var (
 
 // Job is a job as people see it. The image itself isn't loaded.
 type Job struct {
-	ID         int64        `json:"id"`
-	Kind       string       `json:"kind"`
-	Text       string       `json:"text,omitempty"`
-	Lines      []string     `json:"lines,omitempty"`
-	Size       string       `json:"size,omitempty"`
-	Align      string       `json:"align,omitempty"`
-	TapeMM     int          `json:"tape_mm,omitempty"`
-	Status     string       `json:"status"`
-	Submitter  string       `json:"submitter"`
-	CreatedAt  time.Time    `json:"created_at"`
-	SentAt     *time.Time   `json:"sent_at,omitempty"`
-	FinishedAt *time.Time   `json:"finished_at,omitempty"`
-	Result     *wire.Result `json:"result,omitempty"`
+	ID          int64        `json:"id"`
+	Printer     string       `json:"printer"`
+	Kind        string       `json:"kind"`
+	Media       string       `json:"media,omitempty"`
+	Orientation string       `json:"orientation,omitempty"`
+	Text        string       `json:"text,omitempty"`
+	Lines       []string     `json:"lines,omitempty"`
+	Size        string       `json:"size,omitempty"`
+	Align       string       `json:"align,omitempty"`
+	TapeMM      int          `json:"tape_mm,omitempty"`
+	Status      string       `json:"status"`
+	Submitter   string       `json:"submitter"`
+	CreatedAt   time.Time    `json:"created_at"`
+	SentAt      *time.Time   `json:"sent_at,omitempty"`
+	FinishedAt  *time.Time   `json:"finished_at,omitempty"`
+	Result      *wire.Result `json:"result,omitempty"`
 }
+
+// FirstPrinter is the printer that jobs from before there could be several
+// belong to.
+const FirstPrinter = "ptouch"
 
 type Store struct{ db *sql.DB }
 
 const schema = `
 CREATE TABLE IF NOT EXISTS jobs (
 	id          INTEGER PRIMARY KEY,
+	printer     TEXT    NOT NULL,
 	kind        TEXT    NOT NULL,
+	media       TEXT    NOT NULL DEFAULT '',
+	orientation TEXT    NOT NULL DEFAULT '',
 	text        TEXT    NOT NULL DEFAULT '', -- a text job's lines, joined by newlines
 	size        TEXT    NOT NULL DEFAULT '',
 	align       TEXT    NOT NULL DEFAULT '',
@@ -82,7 +92,34 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("creating schema: %w", err)
 	}
+	if err := addPrinterColumns(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("upgrading schema: %w", err)
+	}
 	return &Store{db}, nil
+}
+
+// addPrinterColumns upgrades a database from before there were several printers.
+func addPrinterColumns(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name = 'printer'`).Scan(&n); err != nil || n > 0 {
+		return err
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, column := range []string{
+		`printer TEXT NOT NULL DEFAULT '` + FirstPrinter + `'`,
+		`media TEXT NOT NULL DEFAULT ''`,
+		`orientation TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, err := tx.Exec(`ALTER TABLE jobs ADD COLUMN ` + column); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -90,8 +127,9 @@ func (s *Store) Close() error { return s.db.Close() }
 // Add queues a job. job.ID is ignored.
 func (s *Store) Add(ctx context.Context, job wire.Job, submitter string, now time.Time) (Job, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO jobs (kind, text, size, align, tape_mm, image, status, submitter, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		job.Kind, joinLines(job), job.Size, job.Align, job.TapeMM, job.Image, Queued, submitter, now.UnixMilli())
+		`INSERT INTO jobs (printer, kind, media, orientation, text, size, align, tape_mm, image, status, submitter, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		job.Printer, job.Kind, job.Media, job.Orientation, joinLines(job), job.Size, job.Align, job.TapeMM, job.Image, Queued, submitter, now.UnixMilli())
 	if err != nil {
 		return Job{}, err
 	}
@@ -102,15 +140,15 @@ func (s *Store) Add(ctx context.Context, job wire.Job, submitter string, now tim
 	return s.Get(ctx, id)
 }
 
-// Claim marks the oldest queued job sent and returns it, or nil if the queue
-// is empty.
-func (s *Store) Claim(ctx context.Context, now time.Time) (*wire.Job, error) {
+// Claim marks printer's oldest queued job sent and returns it, or nil if it has
+// none.
+func (s *Store) Claim(ctx context.Context, printer string, now time.Time) (*wire.Job, error) {
 	var j wire.Job
 	err := s.db.QueryRowContext(ctx, `
 		UPDATE jobs SET status = ?, sent_at = ?
-		WHERE id = (SELECT id FROM jobs WHERE status = ? ORDER BY id LIMIT 1)
-		RETURNING id, kind, text, size, align, tape_mm, image`,
-		Sent, now.UnixMilli(), Queued).Scan(&j.ID, &j.Kind, &j.Text, &j.Size, &j.Align, &j.TapeMM, &j.Image)
+		WHERE id = (SELECT id FROM jobs WHERE status = ? AND printer = ? ORDER BY id LIMIT 1)
+		RETURNING id, kind, media, orientation, text, size, align, tape_mm, image`,
+		Sent, now.UnixMilli(), Queued, printer).Scan(&j.ID, &j.Kind, &j.Media, &j.Orientation, &j.Text, &j.Size, &j.Align, &j.TapeMM, &j.Image)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -121,9 +159,9 @@ func (s *Store) Claim(ctx context.Context, now time.Time) (*wire.Job, error) {
 	return &j, nil
 }
 
-// Finish records the board's result for a sent job. The image is dropped:
-// nothing will print it again.
-func (s *Store) Finish(ctx context.Context, id int64, r wire.Result, now time.Time) error {
+// Finish records the result printer's board gives for a job sent to it; another
+// printer's job is ErrNotFound. The image is dropped: nothing will print it again.
+func (s *Store) Finish(ctx context.Context, printer string, id int64, r wire.Result, now time.Time) error {
 	status := Failed
 	if r.Printed {
 		status = Done
@@ -133,21 +171,25 @@ func (s *Store) Finish(ctx context.Context, id int64, r wire.Result, now time.Ti
 		return err
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE jobs SET status = ?, finished_at = ?, result = ?, image = NULL WHERE id = ? AND status = ?`,
-		status, now.UnixMilli(), string(b), id, Sent)
+		`UPDATE jobs SET status = ?, finished_at = ?, result = ?, image = NULL WHERE id = ? AND printer = ? AND status = ?`,
+		status, now.UnixMilli(), string(b), id, printer, Sent)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		if _, err := s.Get(ctx, id); err != nil {
+		j, err := s.Get(ctx, id)
+		if err != nil {
 			return err
+		}
+		if j.Printer != printer {
+			return ErrNotFound
 		}
 		return ErrNotSent
 	}
 	return nil
 }
 
-const columns = `id, kind, text, size, align, tape_mm, status, submitter, created_at, sent_at, finished_at, result`
+const columns = `id, printer, kind, media, orientation, text, size, align, tape_mm, status, submitter, created_at, sent_at, finished_at, result`
 
 func (s *Store) Get(ctx context.Context, id int64) (Job, error) {
 	j, err := scan(s.db.QueryRowContext(ctx, `SELECT `+columns+` FROM jobs WHERE id = ?`, id))
@@ -191,7 +233,7 @@ func scan(row interface{ Scan(...any) error }) (Job, error) {
 		sent, finished sql.NullInt64
 		result         sql.NullString
 	)
-	if err := row.Scan(&j.ID, &j.Kind, &j.Text, &j.Size, &j.Align, &j.TapeMM, &j.Status, &j.Submitter, &created, &sent, &finished, &result); err != nil {
+	if err := row.Scan(&j.ID, &j.Printer, &j.Kind, &j.Media, &j.Orientation, &j.Text, &j.Size, &j.Align, &j.TapeMM, &j.Status, &j.Submitter, &created, &sent, &finished, &result); err != nil {
 		return Job{}, err
 	}
 	j.Text, j.Lines = splitLines(j.Kind, j.Text)

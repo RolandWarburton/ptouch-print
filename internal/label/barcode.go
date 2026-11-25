@@ -1,4 +1,4 @@
-// Package label draws labels for the P-touch.
+// Package label draws labels and holds the rules for what fits on them.
 package label
 
 import (

@@ -1,5 +1,5 @@
 // Package server is the command server: a job queue in SQLite with three ways
-// in — the board's poll API, the REST submit API and MCP — all calling Service.
+// in — the boards' poll API, the REST submit API and MCP — all calling Service.
 package server
 
 import (
@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"image/png"
 	"log/slog"
 	"net/http"
@@ -19,7 +20,7 @@ import (
 )
 
 const (
-	// OfflineAfter is how long since the board's last poll before submits are
+	// OfflineAfter is how long since a board's last poll before its submits are
 	// refused. The board polls every 15 s, so this is four missed polls.
 	OfflineAfter = 60 * time.Second
 	// Retention is how long jobs are kept.
@@ -43,75 +44,108 @@ func refuse(status int, code, format string, args ...any) *Error {
 }
 
 type Service struct {
-	store *store.Store
-	log   *slog.Logger
-	now   func() time.Time
+	store    *store.Store
+	printers []*printerState
+	log      *slog.Logger
+	now      func() time.Time
 
-	// What the board's last poll said: the tape, or 0 and why it can't print,
-	// and the Wi-Fi network it's on.
-	mu       sync.Mutex
-	lastPoll time.Time
-	tapeMM   int
-	problem  string
-	wifi     string
+	mu sync.Mutex // guards what polls change in printers
 }
 
-// problems says how to fix each reason the board gives for not printing.
-var problems = map[string]string{
-	wire.CodeEditorLite:      "The printer is in Editor Lite mode. Hold its Editor Lite button until the light goes off.",
-	wire.CodeNotConnected:    "The board can't find the printer. Check it's switched on and plugged into the board's data USB port.",
-	wire.CodePrinterError:    "The printer reports an error, such as its cover open or no tape. Check the printer.",
-	wire.CodeUnsupportedTape: "The loaded tape isn't supported. Load 12 or 24 mm tape.",
-	wire.CodePermission:      "The board isn't allowed to open the printer. That's a setup problem on the board (its udev rule or lp group).",
-	wire.CodeNoReply:         "The printer didn't answer the board. Try switching it off and on.",
-	wire.CodeBusy:            "The printer is busy with something else.",
-	"printer_not_ready":      "The board says the printer can't print but not why. Check the printer.",
+func NewService(st *store.Store, printers []Printer, log *slog.Logger) *Service {
+	s := &Service{store: st, log: log, now: time.Now}
+	for _, p := range printers {
+		s.printers = append(s.printers, &printerState{Printer: p})
+	}
+	return s
 }
 
-// notReady is the refusal for a board that polls without a ready printer.
-func notReady(problem string) *Error {
+// Next records a printer's poll and hands its board that printer's oldest
+// queued job, if any, even while the printer has a problem: that job fails now
+// rather than printing later, unexpectedly.
+func (s *Service) Next(ctx context.Context, printer string, poll Poll) (*wire.Job, error) {
+	p, err := s.printer(printer)
+	if err != nil {
+		return nil, err
+	}
+	// Media the server doesn't know can't be checked against a job, so it's a
+	// problem too. Either media or problem is set, never both.
+	var media wire.Media
+	problem := poll.Problem
 	if problem == "" {
-		problem = "printer_not_ready" // a board too old to say why
+		var ok bool
+		if media, ok = wire.FindMedia(p.Family, poll.Media); !ok {
+			switch {
+			case poll.Media == "":
+				problem = codeNotReady // a board too old to say why
+			case p.Family == wire.FamilyPTP700:
+				problem = wire.CodeUnsupportedTape
+			default:
+				problem = wire.CodeUnsupportedMedia
+			}
+		}
 	}
-	msg, ok := problems[problem]
-	if !ok {
-		msg = "The printer can't print right now (" + problem + ")."
-	}
-	return &Error{Status: http.StatusServiceUnavailable, Code: problem, Msg: msg}
-}
-
-func NewService(st *store.Store, log *slog.Logger) *Service {
-	return &Service{store: st, log: log, now: time.Now}
-}
-
-// Next records the board's poll and hands it the oldest queued job, if any,
-// even while the printer has a problem: that job fails now rather than
-// printing later, unexpectedly.
-func (s *Service) Next(ctx context.Context, tapeMM int, problem, wifi string) (*wire.Job, error) {
 	now := s.now()
 	s.mu.Lock()
-	was, wasWiFi := s.problem, s.wifi
-	s.lastPoll, s.tapeMM, s.problem, s.wifi = now, tapeMM, problem, wifi
+	was, wasWiFi := p.problem, p.wifi
+	p.lastPoll, p.media, p.problem, p.wifi = now, media, problem, poll.WiFi
 	s.mu.Unlock()
-	if wifi != wasWiFi {
-		s.log.Info("board's Wi-Fi", "wifi", wifi, "was", wasWiFi)
+	log := s.log.With("printer", p.Name)
+	if poll.WiFi != wasWiFi {
+		log.Info("board's Wi-Fi", "wifi", poll.WiFi, "was", wasWiFi)
 	}
 	switch {
 	case problem != was && problem != "":
-		s.log.Warn("printer can't print", "problem", problem)
+		log.Warn("printer can't print", "problem", problem, "media", poll.Media)
 	case problem != was:
-		s.log.Info("printer ready again", "was", was)
+		log.Info("printer ready again", "was", was)
 	}
-	job, err := s.store.Claim(ctx, now)
-	if job != nil {
-		s.log.Info("job sent", "job", job.ID, "kind", job.Kind)
+	job, err := s.store.Claim(ctx, p.Name, now)
+	if job == nil || err != nil {
+		return nil, err
 	}
-	return job, err
+	if !poll.Draws {
+		drawn, failed := s.draw(job, p.Family, media, problem)
+		if failed != nil {
+			// Nothing was sent, so it's over: jobs are never requeued.
+			log.Warn("job not sent", "job", job.ID, "kind", job.Kind, "code", failed.Code, "err", failed.Error)
+			return nil, s.store.Finish(ctx, p.Name, job.ID, *failed, s.now())
+		}
+		job = drawn
+	}
+	log.Info("job sent", "job", job.ID, "kind", job.Kind)
+	return job, nil
 }
 
-// Report records the result of a job the board took.
-func (s *Service) Report(ctx context.Context, id int64, r wire.Result) error {
-	err := s.store.Finish(ctx, id, r, s.now())
+// draw makes a claimed job the raster its board prints on the loaded media, or
+// says why it can't: the media may have changed since it was submitted.
+func (s *Service) draw(job *wire.Job, family string, media wire.Media, problem string) (*wire.Job, *wire.Result) {
+	fail := func(code, format string, args ...any) (*wire.Job, *wire.Result) {
+		r := wire.Failed(code, fmt.Sprintf(format, args...))
+		r.LoadedMedia, r.LoadedTapeMM = media.ID, media.TapeMM
+		return nil, &r
+	}
+	switch {
+	case problem != "":
+		return fail(problem, "%s", fix(family, problem))
+	case job.Media != "" && job.Media != media.ID:
+		return fail(wire.CodeWrongMedia, "the job is for %s but %s is loaded", job.Media, media.ID)
+	case job.Kind == wire.KindImage && job.TapeMM != media.TapeMM:
+		return fail(wire.CodeTapeMismatch, "image is for %d mm tape but %d mm is loaded", job.TapeMM, media.TapeMM)
+	}
+	raster, err := label.Draw(*job, media)
+	if te, ok := errors.AsType[*label.TextError](err); ok {
+		return fail(te.Code, "%s", te.Msg)
+	}
+	if err != nil {
+		return fail(wire.CodeInternal, "drawing the label: %v", err)
+	}
+	return &wire.Job{ID: job.ID, Kind: job.Kind, Raster: raster}, nil
+}
+
+// Report records the result of a job the printer's board took.
+func (s *Service) Report(ctx context.Context, printer string, id int64, r wire.Result) error {
+	err := s.store.Finish(ctx, printer, id, r, s.now())
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return refuse(http.StatusNotFound, "not_found", "no job %d", id)
@@ -120,73 +154,130 @@ func (s *Service) Report(ctx context.Context, id int64, r wire.Result) error {
 	case err != nil:
 		return err
 	}
-	s.log.Info("job finished", "job", id, "printed", r.Printed, "code", r.Code)
+	s.log.Info("job finished", "job", id, "printer", printer, "printed", r.Printed, "code", r.Code)
 	return nil
 }
 
-// Submit queues a job for who, once it is sure the board can print it now.
-// Nothing about the printer is promised beyond that: a job is never retried.
-func (s *Service) Submit(ctx context.Context, who string, job wire.Job) (store.Job, error) {
-	var height int
-	switch job.Kind {
+// Submit queues a job for who, once it is sure the job's printer can print it
+// now. Nothing about the printer is promised beyond that: a job is never retried.
+func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.Job, error) {
+	p, err := s.printer(req.Printer)
+	if err != nil {
+		return store.Job{}, err
+	}
+	// Only what the kind uses is kept.
+	job := wire.Job{Printer: p.Name, Kind: req.Kind, Media: req.Media}
+	var size image.Config
+	switch req.Kind {
 	case wire.KindBarcode:
-		if msg := wire.ValidateText(job.Text); msg != "" {
+		if msg := wire.ValidateText(req.Text); msg != "" {
 			return store.Job{}, refuse(http.StatusBadRequest, "bad_text", "%s", msg)
 		}
-		job = wire.Job{Kind: job.Kind, Text: job.Text}
+		job.Text = req.Text
 	case wire.KindText:
-		// Checked below, once the loaded tape is known.
-		job = wire.Job{Kind: job.Kind, Lines: job.Lines, Size: job.Size, Align: job.Align}
+		// Checked below, once the loaded media is known.
+		job.Lines, job.Size, job.Align = req.Lines, req.Size, req.Align
 	case wire.KindImage:
-		if len(job.Image) > wire.MaxImageBytes {
+		if len(req.Image) > wire.MaxImageBytes {
 			return store.Job{}, refuse(http.StatusRequestEntityTooLarge, "too_large", "image is over %d bytes", wire.MaxImageBytes)
 		}
-		cfg, err := png.DecodeConfig(bytes.NewReader(job.Image))
-		if err != nil {
+		if size, err = png.DecodeConfig(bytes.NewReader(req.Image)); err != nil {
 			return store.Job{}, refuse(http.StatusBadRequest, "bad_image", "image must be a PNG")
 		}
-		if job.TapeMM <= 0 {
+		if p.Family == wire.FamilyPTP700 && req.TapeMM <= 0 {
 			return store.Job{}, refuse(http.StatusBadRequest, "bad_request", "tape_mm is required for an image")
 		}
-		height = cfg.Height
-		job = wire.Job{Kind: job.Kind, TapeMM: job.TapeMM, Image: job.Image}
+		job.Image, job.TapeMM = req.Image, req.TapeMM
 	default:
 		return store.Job{}, refuse(http.StatusBadRequest, "bad_request", `kind must be "barcode", "text" or "image"`)
 	}
+	if job.Orientation, err = orientation(p.Family, req); err != nil {
+		return store.Job{}, err
+	}
+	if p.Family != wire.FamilyPTP700 && req.TapeMM != 0 {
+		return store.Job{}, refuse(http.StatusBadRequest, "bad_request", "%s doesn't take tape; leave out tape_mm", p.Name)
+	}
 
-	st := s.Status()
+	s.mu.Lock()
+	st := s.status(p)
+	s.mu.Unlock()
 	if !st.Online {
 		return store.Job{}, refuse(http.StatusServiceUnavailable, "printer_offline",
-			"the printer hasn't checked in for over %v; check its power and Wi-Fi", OfflineAfter)
+			"%s hasn't checked in for over %v; check its power and Wi-Fi", p.Name, OfflineAfter)
 	}
-	if st.TapeMM == 0 {
-		return store.Job{}, notReady(st.Problem)
+	if st.Problem != "" {
+		return store.Job{}, refuse(http.StatusServiceUnavailable, st.Problem, "%s", st.Fix)
 	}
-	if job.Kind == wire.KindText {
-		// What needs drawing (glyphs, length) is checked on the board.
-		t, err := label.CheckText(label.TextLabel{Lines: job.Lines, Size: job.Size, Align: job.Align}, st.TapeMM)
+	if job.Media != "" && job.Media != st.Media {
+		return store.Job{}, refuse(http.StatusConflict, wire.CodeWrongMedia,
+			"the job is for %s but %s has %s loaded", job.Media, p.Name, st.Media)
+	}
+	if p.Family != wire.FamilyPTP700 {
+		job.Media = st.Media // so the board can refuse it if the labels are changed meanwhile
+	}
+	switch job.Kind {
+	case wire.KindText:
+		t := label.TextLabel{Lines: job.Lines, Size: job.Size, Align: job.Align}
+		if p.Family == wire.FamilyPTP700 {
+			t, err = label.CheckText(t, st.TapeMM)
+		} else {
+			t, err = label.CheckDieCutText(t)
+		}
 		if err != nil {
 			te := err.(*label.TextError)
 			return store.Job{}, refuse(http.StatusBadRequest, te.Code, "%s", te.Msg)
 		}
 		job.Lines, job.Size, job.Align = t.Lines, t.Size, t.Align
-	}
-	if job.Kind == wire.KindImage {
+	case wire.KindImage:
 		if job.TapeMM != st.TapeMM {
 			return store.Job{}, refuse(http.StatusConflict, "tape_mismatch",
 				"image is for %d mm tape but %d mm is loaded", job.TapeMM, st.TapeMM)
 		}
-		if height != st.HeightDots {
-			return store.Job{}, refuse(http.StatusUnprocessableEntity, "wrong_height",
-				"image is %d dots high; %d mm tape needs %d", height, st.TapeMM, st.HeightDots)
+		if st.WidthDots != 0 && (size.Width != st.WidthDots || size.Height != st.HeightDots) {
+			return store.Job{}, refuse(http.StatusUnprocessableEntity, "wrong_size",
+				"image is %dx%d dots; %s needs %dx%d", size.Width, size.Height, st.Media, st.WidthDots, st.HeightDots)
 		}
+		if size.Height != st.HeightDots {
+			return store.Job{}, refuse(http.StatusUnprocessableEntity, "wrong_height",
+				"image is %d dots high; %d mm tape needs %d", size.Height, st.TapeMM, st.HeightDots)
+		}
+	}
+
+	// Drawing it is how to know it fits. It is drawn again for the board.
+	media, ok := wire.FindMedia(p.Family, st.Media)
+	if !ok {
+		return store.Job{}, fmt.Errorf("%s has unknown media %q", p.Name, st.Media)
+	}
+	if _, err := label.Draw(job, media); err != nil {
+		if te, ok := errors.AsType[*label.TextError](err); ok {
+			return store.Job{}, refuse(http.StatusBadRequest, te.Code, "%s", te.Msg)
+		}
+		return store.Job{}, err
 	}
 
 	j, err := s.store.Add(ctx, job, who, s.now())
 	if err == nil {
-		s.log.Info("job queued", "job", j.ID, "kind", j.Kind, "submitter", who)
+		s.log.Info("job queued", "job", j.ID, "printer", p.Name, "kind", j.Kind, "submitter", who)
 	}
 	return j, err
+}
+
+// orientation checks a job's orientation, which only text and barcodes on a
+// LabelWriter have, and gives it its default.
+func orientation(family string, req wire.Job) (string, error) {
+	if family == wire.FamilyPTP700 || req.Kind == wire.KindImage {
+		if req.Orientation != "" {
+			return "", refuse(http.StatusBadRequest, "bad_request", "orientation is only for text and barcodes on a LabelWriter")
+		}
+		return "", nil
+	}
+	switch req.Orientation {
+	case "":
+		return wire.OrientPortrait, nil
+	case wire.OrientPortrait, wire.OrientLandscape:
+		return req.Orientation, nil
+	}
+	return "", refuse(http.StatusBadRequest, "bad_request", `orientation must be "portrait" or "landscape"`)
 }
 
 func (s *Service) Get(ctx context.Context, id int64) (store.Job, error) {
@@ -203,38 +294,6 @@ func (s *Service) List(ctx context.Context, limit int) ([]store.Job, error) {
 		limit = defaultListLimit
 	}
 	return s.store.List(ctx, min(limit, maxListLimit))
-}
-
-// BoardStatus is what the server knows of the board from its polls.
-type BoardStatus struct {
-	Online     bool       `json:"online"`
-	LastPoll   *time.Time `json:"last_poll,omitempty"`
-	TapeMM     int        `json:"tape_mm"`
-	HeightDots int        `json:"height_dots,omitempty"` // the image height the tape needs
-	Problem    string     `json:"problem,omitempty"`     // why it can't print, e.g. editor_lite
-	Fix        string     `json:"fix,omitempty"`         // how to fix Problem, for people
-	WiFi       string     `json:"wifi,omitempty"`        // the board's Wi-Fi network at LastPoll
-}
-
-func (s *Service) Status() BoardStatus {
-	s.mu.Lock()
-	last, tape, problem, wifi := s.lastPoll.UTC(), s.tapeMM, s.problem, s.wifi
-	s.mu.Unlock()
-	if last.IsZero() {
-		return BoardStatus{}
-	}
-	// The Wi-Fi network is kept while offline: where the board was is a clue to why.
-	st := BoardStatus{Online: s.now().Sub(last) <= OfflineAfter, LastPoll: &last, WiFi: wifi}
-	if st.Online {
-		st.TapeMM, st.Problem = tape, problem
-		if problem != "" {
-			st.Fix = notReady(problem).Msg
-		}
-		if t, ok := wire.Tape(tape); ok {
-			st.HeightDots = t.Dots
-		}
-	}
-	return st
 }
 
 // Prune deletes jobs older than Retention, then again every day until ctx ends.

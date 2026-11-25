@@ -41,15 +41,20 @@ func newEnv(t *testing.T, dex *DexConfig) *env {
 // newEnvWith is newEnv with more options; the tokens are always the test ones.
 func newEnvWith(t *testing.T, opts Options) *env {
 	t.Helper()
+	return newEnvPrinters(t, opts, Printer{"ptouch", wire.FamilyPTP700, HashToken(boardToken)})
+}
+
+func newEnvPrinters(t *testing.T, opts Options, printers ...Printer) *env {
+	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "jobs.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	e := &env{t: t, svc: NewService(st, log), now: time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)}
+	e := &env{t: t, svc: NewService(st, printers, log), now: time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)}
 	e.svc.now = func() time.Time { return e.now }
-	opts.BoardTokenHash, opts.ClientTokens = HashToken(boardToken), Tokens{HashToken(clientToken): "ci"}
+	opts.ClientTokens = Tokens{HashToken(clientToken): "ci"}
 	h, err := NewHandler(e.svc, opts, log)
 	if err != nil {
 		t.Fatal(err)
@@ -90,9 +95,18 @@ func (e *env) poll(tape string) (int, map[string]any) {
 	return e.do("GET", "/board/next?tape_mm="+tape, boardToken, nil)
 }
 
-func pngB64(t *testing.T, h int) string {
+// status is the first printer's status.
+func (e *env) status() map[string]any {
+	e.t.Helper()
+	_, body := e.do("GET", "/api/status", clientToken, nil)
+	return body["printers"].([]any)[0].(map[string]any)
+}
+
+func pngB64(t *testing.T, h int) string { return pngSize(t, 50, h) }
+
+func pngSize(t *testing.T, w, h int) string {
 	var b bytes.Buffer
-	if err := png.Encode(&b, image.NewGray(image.Rect(0, 0, 50, h))); err != nil {
+	if err := png.Encode(&b, image.NewGray(image.Rect(0, 0, w, h))); err != nil {
 		t.Fatal(err)
 	}
 	return base64.StdEncoding.EncodeToString(b.Bytes())
@@ -151,7 +165,7 @@ func TestOfflineAfterMissedPolls(t *testing.T) {
 		body["code"] != "printer_offline" {
 		t.Errorf("%d %v", code, body)
 	}
-	if _, st := e.do("GET", "/api/status", clientToken, nil); st["online"] != false || st["tape_mm"] != 0.0 {
+	if st := e.status(); st["online"] != false || st["tape_mm"] != nil {
 		t.Errorf("status %v", st)
 	}
 }
@@ -160,11 +174,11 @@ func TestOfflineAfterMissedPolls(t *testing.T) {
 func TestWiFi(t *testing.T) {
 	e := newEnv(t, nil)
 	e.poll("24&wifi=Home%20Net")
-	if _, st := e.do("GET", "/api/status", clientToken, nil); st["wifi"] != "Home Net" {
+	if st := e.status(); st["wifi"] != "Home Net" {
 		t.Errorf("status %v", st)
 	}
 	e.now = e.now.Add(OfflineAfter + time.Second)
-	if _, st := e.do("GET", "/api/status", clientToken, nil); st["online"] != false || st["wifi"] != "Home Net" {
+	if st := e.status(); st["online"] != false || st["wifi"] != "Home Net" {
 		t.Errorf("offline status %v", st)
 	}
 	// A name that isn't printable, or is too long for an SSID, is dropped; the poll still works.
@@ -172,7 +186,7 @@ func TestWiFi(t *testing.T) {
 		if code, _ := e.poll("24&wifi=" + name); code != 204 {
 			t.Errorf("wifi %q: poll %d", name, code)
 		}
-		if _, st := e.do("GET", "/api/status", clientToken, nil); st["wifi"] != nil {
+		if st := e.status(); st["wifi"] != nil {
 			t.Errorf("wifi %q: status %v", name, st)
 		}
 	}
@@ -186,6 +200,7 @@ func TestPrinterProblems(t *testing.T) {
 		{"0&problem=not_connected", "not_connected"},
 		{"0&problem=from_a_newer_board", "from_a_newer_board"},
 		{"0", "printer_not_ready"},
+		{"18", "unsupported_tape"},
 	} {
 		e.poll(tt.poll)
 		if code, body := e.do("POST", "/api/jobs", clientToken, barcode); code != 503 || body["code"] != tt.code {
@@ -193,12 +208,12 @@ func TestPrinterProblems(t *testing.T) {
 		}
 	}
 	e.poll("0&problem=editor_lite")
-	if _, st := e.do("GET", "/api/status", clientToken, nil); st["problem"] != "editor_lite" || st["tape_mm"] != 0.0 {
+	if st := e.status(); st["problem"] != "editor_lite" || st["tape_mm"] != nil {
 		t.Errorf("status with a problem: %v", st)
 	}
 	// A poll without a problem clears it.
 	e.poll("24")
-	if _, st := e.do("GET", "/api/status", clientToken, nil); st["problem"] != nil || st["tape_mm"] != 24.0 {
+	if st := e.status(); st["problem"] != nil || st["tape_mm"] != 24.0 {
 		t.Errorf("status after the fix: %v", st)
 	}
 	if code, _ := e.do("POST", "/api/jobs", clientToken, barcode); code != 201 {
@@ -223,7 +238,7 @@ func TestQueuedJobHandedOutDespiteProblem(t *testing.T) {
 func TestImageJobs(t *testing.T) {
 	e := newEnv(t, nil)
 	e.poll("24")
-	if _, st := e.do("GET", "/api/status", clientToken, nil); st["online"] != true || st["height_dots"] != 128.0 {
+	if st := e.status(); st["online"] != true || st["height_dots"] != 128.0 {
 		t.Fatalf("status %v", st)
 	}
 	for _, tt := range []struct {
@@ -451,8 +466,9 @@ func TestParseTokens(t *testing.T) {
 	}
 }
 
-func TestBoardTokenRequired(t *testing.T) {
-	if _, err := NewHandler(nil, Options{}, slog.New(slog.NewTextHandler(io.Discard, nil))); err == nil {
-		t.Error("started without a board token")
+func TestPrinterRequired(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if _, err := NewHandler(NewService(nil, nil, log), Options{}, log); err == nil {
+		t.Error("started without a printer")
 	}
 }

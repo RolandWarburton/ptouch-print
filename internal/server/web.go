@@ -47,7 +47,7 @@ type webUI struct {
 
 func newWebUI(dex *dexAuth, secret string) (*webUI, error) {
 	if secret == "" {
-		return nil, errors.New("PTOUCH_WEB_OIDC_SECRET must be set (the secret of Dex client " + webClientID + ")")
+		return nil, errors.New("PRINT_WEB_OIDC_SECRET must be set (the secret of Dex client " + webClientID + ")")
 	}
 	u, _ := url.Parse(dex.resourceURL)
 	key := make([]byte, 32)

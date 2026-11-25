@@ -1,0 +1,21 @@
+# A board's settings. Copy to settings.<board>.toml, fill in, then: make settings SETTINGS=settings.<board>.toml
+
+# The command server, which must be https://.
+server = "https://ptouch.example.com"
+
+# The board's token, made on the server with:
+#   docker compose run --rm ptouch ptouch-command-server token -printer NAME -family FAMILY
+# where FAMILY is pt-p700, lw450 or lw550.
+token = "the board's token"
+
+# LabelWriter 450 only, which can't tell what's in it. Leave it out for other printers.
+media = "large-address"
+
+# Wi-Fi networks, 2.4 GHz with WPA2 or WPA3, in order of preference. Up to four.
+[[wifi]]
+ssid = "the network to prefer"
+pass = "its password"
+
+[[wifi]]
+ssid = "the one to fall back to"
+pass = "its password"

@@ -1,5 +1,5 @@
-// The ptouch web UI: the printer's state, the newest labels, and a form to
-// print one. It polls /api/status and /api/jobs while the tab is visible and
+// The label-server web UI: the printers' state, the newest labels, and a form to
+// print one on the chosen printer. It polls /api/status and /api/jobs while the tab is visible and
 // signs in through the server's /auth/* routes, which set a session cookie.
 'use strict';
 
@@ -9,7 +9,8 @@ const LIST_LIMIT = 20;
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  status: null, // /api/status
+  printers: [], // /api/status, in the server's order
+  printer: null, // the chosen printer's name
   jobs: [], // /api/jobs, newest first
   seen: null, // job ids already shown, so new ones flash; null before the first load
   filter: 'all',
@@ -17,7 +18,17 @@ const state = {
   extra: null, // the open job when it isn't among the newest
   size: 'large', // a text label's size and alignment
   align: 'left',
+  orientation: 'landscape', // LabelWriter only
 };
+
+// The chosen printer's status, or {} before the first load.
+function chosen() {
+  return state.printers.find((p) => p.name === state.printer) || {};
+}
+
+function isTape(p) {
+  return p.family === 'pt-p700';
+}
 
 // --- API -------------------------------------------------------------------
 
@@ -34,7 +45,11 @@ async function api(path, options = {}) {
 async function refresh() {
   try {
     const [status, jobs] = await Promise.all([api('/api/status'), api(`/api/jobs?limit=${LIST_LIMIT}`)]);
-    state.status = status;
+    state.printers = status.printers;
+    if (!chosen().name) {
+      state.printer = state.printers[0].name;
+      say('');
+    }
     state.jobs = jobs || [];
     render();
   } catch (err) {
@@ -133,8 +148,8 @@ function showSignIn() {
 }
 
 function ready() {
-  const st = state.status;
-  return !!(st && st.online && !st.problem && st.tape_mm);
+  const st = chosen();
+  return !!(st.online && st.media);
 }
 
 function render() {
@@ -146,8 +161,31 @@ function render() {
   renderForm();
 }
 
+// The size an image for the loaded media must be, in words.
+function imageSize(st) {
+  if (!st.height_dots) return '';
+  return st.width_dots ? `${st.width_dots} × ${st.height_dots} dots` : `${st.height_dots} dots high`;
+}
+
 function renderPrinter() {
-  const st = state.status || {};
+  const st = chosen();
+  const several = state.printers.length > 1;
+  $('printer').hidden = !several;
+  // Rebuilt only when the printers change, so a button keeps its focus.
+  const names = state.printers.map((p) => p.name).join(' ');
+  if ($('printer').dataset.names !== names) {
+    $('printer').dataset.names = names;
+    $('printer').replaceChildren(...state.printers.map((p) => {
+      const b = el('button', '', p.name);
+      b.type = 'button';
+      b.dataset.printer = p.name;
+      return b;
+    }));
+  }
+  pressed('printer', 'printer');
+  $('print-on').hidden = !several;
+  $('print-on').textContent = `on ${st.name}`;
+
   let tag = 'Ready';
   let fix = '';
   let hot = false;
@@ -161,16 +199,13 @@ function renderPrinter() {
   } else if (st.problem) {
     tag = st.problem.replace(/_/g, ' ');
     fix = st.fix || '';
-  } else if (!st.tape_mm) {
-    tag = 'No tape';
-    fix = 'The printer reports no supported tape. Load 12 or 24 mm tape.';
   }
   $('printer-state').textContent = tag;
   $('printer-fix').textContent = fix;
   $('printer-fix').hidden = !fix;
   $('printer-fix').classList.toggle('is-hot', hot);
-  $('tape').textContent = st.online && st.tape_mm ? `${st.tape_mm} mm` : 'None reported';
-  $('height').textContent = st.online && st.height_dots ? `${st.height_dots} dots` : '—';
+  $('media').textContent = st.media_name || 'None reported';
+  $('image-size').textContent = imageSize(st) || '—';
   if (st.last_poll) setTime($('checked'), st.last_poll);
   else $('checked').textContent = 'Never';
   $('wifi').textContent = st.wifi || '—';
@@ -196,7 +231,7 @@ function renderList() {
   const ul = $('rows');
   const keep = new Set();
   shown.forEach((job, i) => {
-    const key = JSON.stringify(job) + (job.id === open);
+    const key = JSON.stringify(job) + (job.id === open) + (state.printers.length > 1);
     let row = rowCache.get(job.id);
     if (!row || row.key !== key) {
       const fresh = state.seen !== null && !state.seen.has(job.id);
@@ -229,6 +264,7 @@ function buildRow(job, selected, fresh) {
   const when = el('span', 'wc-ago');
   when.append(el('time'));
   const meta = el('span', 'wc-meta');
+  if (state.printers.length > 1) meta.append(el('span', '', job.printer));
   meta.append(el('span', '', job.kind));
   if (job.tape_mm) meta.append(el('span', '', `${job.tape_mm} mm`));
   meta.append(el('span', '', job.submitter), el('span', '', `#${job.id}`));
@@ -274,11 +310,13 @@ function renderPane() {
   $('job-why').hidden = !why;
   $('job-why-text').textContent = why;
 
-  const facts = [];
+  const facts = [['Printer', job.printer]];
   if (job.result && job.result.code) facts.push(['Code', job.result.code]);
   facts.push(['May have printed', mayHavePrinted(job)]);
   facts.push(['Kind', { barcode: 'Barcode', text: 'Text', image: 'Image' }[job.kind] || job.kind]);
   if (job.tape_mm) facts.push(['Tape', `${job.tape_mm} mm`]);
+  if (job.media) facts.push(['Media', job.media]);
+  if (job.orientation) facts.push(['Orientation', job.orientation]);
   facts.push(['Submitted by', job.submitter]);
   facts.push(['Queued', when(job.created_at)]);
   if (job.sent_at) facts.push(['Sent', when(job.sent_at)]);
@@ -323,24 +361,30 @@ function renderForm() {
   $('image-fields').hidden = state.kind !== 'image';
   $('print').disabled = !ready();
 
-  const st = state.status || {};
-  $('png-hint').textContent = st.online && st.height_dots
-    ? `Must be ${st.height_dots} dots high for the ${st.tape_mm} mm tape that is loaded. Up to 1 MB.`
-    : 'Must be as many dots high as the loaded tape needs. Up to 1 MB.';
+  const st = chosen();
+  $('png-hint').textContent = imageSize(st)
+    ? `Must be ${imageSize(st)} for the ${st.media_name} that is loaded. Up to 1 MB.`
+    : 'Must be the size the loaded media needs. Up to 1 MB.';
 
-  // Only 24 mm tape takes a second line.
+  // A LabelWriter takes several lines and an orientation. A P-touch takes one
+  // line, or two on 24 mm tape.
+  const tape = isTape(st);
+  $('lines-field').hidden = tape;
+  $('line1-field').hidden = !tape;
+  $('orientation').hidden = tape || state.kind === 'image';
   const oneLine = !!st.tape_mm && st.tape_mm !== 24;
   if (oneLine) $('line2').value = '';
-  $('line2-field').hidden = oneLine;
+  $('line2-field').hidden = !tape || oneLine;
   renderText();
 }
 
-// renderText shows the text label's size and alignment. The board draws the
+// renderText shows the label's size, alignment and orientation. The board draws the
 // label, so there is no preview: problems show when Print is pressed.
 function renderText() {
   pressed('size', 'size');
   pressed('align', 'align');
-  $('align').hidden = $('line2-field').hidden || !$('line2').value.trim();
+  pressed('orientation', 'orientation');
+  $('align').hidden = isTape(chosen()) && ($('line2-field').hidden || !$('line2').value.trim());
 }
 
 function renderBarcode() {
@@ -375,6 +419,8 @@ function say(text, error) {
 async function submit(e) {
   e.preventDefault();
   if (!ready()) return;
+  const st = chosen();
+  const tape = isTape(st);
   let job;
   try {
     if (state.kind === 'barcode') {
@@ -382,14 +428,18 @@ async function submit(e) {
       if (!text) return say('Type the text for the barcode.', true);
       job = { kind: 'barcode', text };
     } else if (state.kind === 'text') {
-      const lines = [$('line1').value, $('line2-field').hidden ? '' : $('line2').value].filter((l) => l.trim());
+      const typed = tape ? [$('line1').value, $('line2-field').hidden ? '' : $('line2').value] : $('lines').value.split('\n');
+      const lines = typed.filter((l) => l.trim());
       if (!lines.length) return say('Type the text for the label.', true);
       job = { kind: 'text', lines, size: state.size, align: state.align };
     } else {
       const file = $('png').files[0];
       if (!file) return say('Choose a PNG image.', true);
-      job = { kind: 'image', tape_mm: state.status.tape_mm, image: await base64(file) };
+      job = { kind: 'image', image: await base64(file) };
+      if (tape) job.tape_mm = st.tape_mm;
     }
+    job.printer = st.name;
+    if (!tape && state.kind !== 'image') job.orientation = state.orientation;
   } catch (err) {
     return say(err.message, true);
   }
@@ -428,7 +478,14 @@ async function start() {
     renderForm();
   });
   $('text').addEventListener('input', renderBarcode);
-  for (const key of ['size', 'align']) {
+  $('printer').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    state.printer = b.dataset.printer;
+    say('');
+    render();
+  });
+  for (const key of ['size', 'align', 'orientation']) {
     $(key).addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;

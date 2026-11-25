@@ -1,0 +1,10 @@
+menu "Board"
+
+    config BOARD_ALLOW_HTTP
+        bool "Allow a plain http:// server"
+        default n
+        help
+            For trying a board against a server on a development machine. The
+            token then travels unencrypted.
+
+endmenu

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,31 +19,33 @@ import (
 
 // Options configures the handler's auth.
 type Options struct {
-	BoardTokenHash string
-	ClientTokens   Tokens
-	Dex            *DexConfig // nil: no Dex, client tokens only
-	WebUI          bool       // serve the web UI; needs Dex, which signs people in
-	WebSecret      string     // the Dex client ptouch-web's secret
+	ClientTokens Tokens
+	Dex          *DexConfig // nil: no Dex, client tokens only
+	WebUI        bool       // serve the web UI; needs Dex, which signs people in
+	WebSecret    string     // the Dex client ptouch-web's secret
 }
 
 // NewHandler serves every route:
 //
-//	GET  /health                                          unauthenticated, for container health checks
-//	GET  /.well-known/oauth-protected-resource[/mcp]      with Dex: tells claude.ai to sign in there
-//	GET  /board/next?tape_mm=N[&problem=CODE][&wifi=NAME] board: take the next job (200) or none (204)
-//	POST /board/jobs/{id}/result                          board: report a job's result
-//	POST /api/jobs                                        client: submit a job
-//	GET  /api/jobs[?limit=N], /api/jobs/{id}              client: newest jobs, one job
-//	GET  /api/status                                      client: is the board online, which tape
-//	POST /mcp                                             client: MCP Streamable HTTP, stateless
+//	GET  /health                                         unauthenticated, for container health checks
+//	GET  /.well-known/oauth-protected-resource[/mcp]     with Dex: tells claude.ai to sign in there
+//	GET  /board/next?media=ID[&problem=CODE][&wifi=NAME] board: take its next job (200) or none (204)
+//	POST /board/jobs/{id}/result                         board: report a job's result
+//	POST /api/jobs                                       client: submit a job
+//	GET  /api/jobs[?limit=N], /api/jobs/{id}             client: newest jobs, one job
+//	GET  /api/status                                     client: each printer: is it online, what's loaded
+//	POST /mcp                                            client: MCP Streamable HTTP, stateless
+//
+// A board's token says which printer it is. The old Raspberry Pi sends tape_mm=N in
+// place of media, and draws its labels itself.
 //
 // With WebUI, also the page at / and /static/, and sign-in at /auth/*; /api/*
 // then accepts a signed-in browser's session cookie too.
 func NewHandler(svc *Service, opts Options, log *slog.Logger) (http.Handler, error) {
-	if !validHash(opts.BoardTokenHash) {
-		return nil, errors.New("the board token hash must be 64 hex characters (see ptouch-command-server token)")
+	if len(svc.printers) == 0 {
+		return nil, errors.New("no printers: set PRINT_PRINTERS (see ptouch-command-server token)")
 	}
-	board := Tokens{opts.BoardTokenHash: "board"}
+	board := svc.boardTokens()
 	client := clientAuth{tokens: opts.ClientTokens}
 	var challenge func(string) string
 	mux := http.NewServeMux()
@@ -114,17 +117,20 @@ func wifiName(s string) string {
 }
 
 func (h handlers) next(w http.ResponseWriter, r *http.Request) {
-	tape, err := strconv.Atoi(r.URL.Query().Get("tape_mm"))
-	if err != nil || tape < 0 {
-		writeError(w, refuse(http.StatusBadRequest, "bad_request", "tape_mm must be a number of mm, or 0"))
+	q := r.URL.Query()
+	media, err := loadedMedia(q)
+	if err != nil {
+		writeError(w, err)
 		return
 	}
-	problem := r.URL.Query().Get(wire.ProblemParam)
+	problem := q.Get(wire.ProblemParam)
 	if problem != "" && !problemCode.MatchString(problem) {
 		writeError(w, refuse(http.StatusBadRequest, "bad_request", "problem must be a lower-case code like editor_lite"))
 		return
 	}
-	job, err := h.svc.Next(r.Context(), tape, problem, wifiName(r.URL.Query().Get(wire.WiFiParam)))
+	job, err := h.svc.Next(r.Context(), boardPrinter(r), Poll{
+		Media: media, Problem: problem, WiFi: wifiName(q.Get(wire.WiFiParam)), Draws: !q.Has(wire.MediaParam),
+	})
 	switch {
 	case err != nil:
 		writeError(w, err)
@@ -133,6 +139,34 @@ func (h handlers) next(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, job)
 	}
+}
+
+// mediaID is the shape of a media id.
+var mediaID = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+
+// loadedMedia is the id of the media a poll says is loaded, or "" for none. A
+// P-touch board may give its tape's width instead.
+func loadedMedia(q url.Values) (string, error) {
+	if q.Has(wire.MediaParam) {
+		id := q.Get(wire.MediaParam)
+		if id != "" && !mediaID.MatchString(id) {
+			return "", refuse(http.StatusBadRequest, "bad_request", "media must be an id like large-address, or empty")
+		}
+		return id, nil
+	}
+	mm, err := strconv.Atoi(q.Get(wire.TapeParam))
+	if err != nil || mm < 0 {
+		return "", refuse(http.StatusBadRequest, "bad_request", "media must be an id, or tape_mm a number of mm or 0")
+	}
+	if mm == 0 {
+		return "", nil
+	}
+	return "tape-" + strconv.Itoa(mm), nil
+}
+
+// boardPrinter is the printer whose token a board request was made with.
+func boardPrinter(r *http.Request) string {
+	return strings.TrimPrefix(Submitter(r.Context()), tokenPrefix)
 }
 
 func (h handlers) result(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +179,7 @@ func (h handlers) result(w http.ResponseWriter, r *http.Request) {
 		writeError(w, refuse(http.StatusBadRequest, "bad_request", "body must be a result"))
 		return
 	}
-	if err := h.svc.Report(r.Context(), id, res); err != nil {
+	if err := h.svc.Report(r.Context(), boardPrinter(r), id, res); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -154,7 +188,9 @@ func (h handlers) result(w http.ResponseWriter, r *http.Request) {
 
 // submit takes {"kind": "barcode", "text": "..."},
 // {"kind": "text", "lines": ["...", "..."], "size": "large", "align": "left"} or
-// {"kind": "image", "tape_mm": 24, "image": "<base64 PNG>"}.
+// {"kind": "image", "tape_mm": 24, "image": "<base64 PNG>"}, each with "printer"
+// when there are several, and "media" to insist on what's loaded. A LabelWriter
+// takes "orientation" on the first two, and no tape_mm.
 func (h handlers) submit(w http.ResponseWriter, r *http.Request) {
 	var job wire.Job
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, wire.MaxImageBytes*4/3+4096))
@@ -206,7 +242,7 @@ func (h handlers) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) status(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, h.svc.Status())
+	writeJSON(w, http.StatusOK, map[string]any{"printers": h.svc.Status()})
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {

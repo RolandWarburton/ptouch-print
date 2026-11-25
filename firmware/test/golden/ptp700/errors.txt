@@ -1,0 +1,512 @@
+00 00 
+01 00 no tape
+02 00 tape ran out
+03 00 no tape, tape ran out
+04 00 cutter jammed
+05 00 no tape, cutter jammed
+06 00 tape ran out, cutter jammed
+07 00 no tape, tape ran out, cutter jammed
+08 00 battery weak
+09 00 no tape, battery weak
+0a 00 tape ran out, battery weak
+0b 00 no tape, tape ran out, battery weak
+0c 00 cutter jammed, battery weak
+0d 00 no tape, cutter jammed, battery weak
+0e 00 tape ran out, cutter jammed, battery weak
+0f 00 no tape, tape ran out, cutter jammed, battery weak
+10 00 
+11 00 no tape
+12 00 tape ran out
+13 00 no tape, tape ran out
+14 00 cutter jammed
+15 00 no tape, cutter jammed
+16 00 tape ran out, cutter jammed
+17 00 no tape, tape ran out, cutter jammed
+18 00 battery weak
+19 00 no tape, battery weak
+1a 00 tape ran out, battery weak
+1b 00 no tape, tape ran out, battery weak
+1c 00 cutter jammed, battery weak
+1d 00 no tape, cutter jammed, battery weak
+1e 00 tape ran out, cutter jammed, battery weak
+1f 00 no tape, tape ran out, cutter jammed, battery weak
+20 00 
+21 00 no tape
+22 00 tape ran out
+23 00 no tape, tape ran out
+24 00 cutter jammed
+25 00 no tape, cutter jammed
+26 00 tape ran out, cutter jammed
+27 00 no tape, tape ran out, cutter jammed
+28 00 battery weak
+29 00 no tape, battery weak
+2a 00 tape ran out, battery weak
+2b 00 no tape, tape ran out, battery weak
+2c 00 cutter jammed, battery weak
+2d 00 no tape, cutter jammed, battery weak
+2e 00 tape ran out, cutter jammed, battery weak
+2f 00 no tape, tape ran out, cutter jammed, battery weak
+30 00 
+31 00 no tape
+32 00 tape ran out
+33 00 no tape, tape ran out
+34 00 cutter jammed
+35 00 no tape, cutter jammed
+36 00 tape ran out, cutter jammed
+37 00 no tape, tape ran out, cutter jammed
+38 00 battery weak
+39 00 no tape, battery weak
+3a 00 tape ran out, battery weak
+3b 00 no tape, tape ran out, battery weak
+3c 00 cutter jammed, battery weak
+3d 00 no tape, cutter jammed, battery weak
+3e 00 tape ran out, cutter jammed, battery weak
+3f 00 no tape, tape ran out, cutter jammed, battery weak
+40 00 printer too hot
+41 00 no tape, printer too hot
+42 00 tape ran out, printer too hot
+43 00 no tape, tape ran out, printer too hot
+44 00 cutter jammed, printer too hot
+45 00 no tape, cutter jammed, printer too hot
+46 00 tape ran out, cutter jammed, printer too hot
+47 00 no tape, tape ran out, cutter jammed, printer too hot
+48 00 battery weak, printer too hot
+49 00 no tape, battery weak, printer too hot
+4a 00 tape ran out, battery weak, printer too hot
+4b 00 no tape, tape ran out, battery weak, printer too hot
+4c 00 cutter jammed, battery weak, printer too hot
+4d 00 no tape, cutter jammed, battery weak, printer too hot
+4e 00 tape ran out, cutter jammed, battery weak, printer too hot
+4f 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot
+50 00 printer too hot
+51 00 no tape, printer too hot
+52 00 tape ran out, printer too hot
+53 00 no tape, tape ran out, printer too hot
+54 00 cutter jammed, printer too hot
+55 00 no tape, cutter jammed, printer too hot
+56 00 tape ran out, cutter jammed, printer too hot
+57 00 no tape, tape ran out, cutter jammed, printer too hot
+58 00 battery weak, printer too hot
+59 00 no tape, battery weak, printer too hot
+5a 00 tape ran out, battery weak, printer too hot
+5b 00 no tape, tape ran out, battery weak, printer too hot
+5c 00 cutter jammed, battery weak, printer too hot
+5d 00 no tape, cutter jammed, battery weak, printer too hot
+5e 00 tape ran out, cutter jammed, battery weak, printer too hot
+5f 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot
+60 00 printer too hot
+61 00 no tape, printer too hot
+62 00 tape ran out, printer too hot
+63 00 no tape, tape ran out, printer too hot
+64 00 cutter jammed, printer too hot
+65 00 no tape, cutter jammed, printer too hot
+66 00 tape ran out, cutter jammed, printer too hot
+67 00 no tape, tape ran out, cutter jammed, printer too hot
+68 00 battery weak, printer too hot
+69 00 no tape, battery weak, printer too hot
+6a 00 tape ran out, battery weak, printer too hot
+6b 00 no tape, tape ran out, battery weak, printer too hot
+6c 00 cutter jammed, battery weak, printer too hot
+6d 00 no tape, cutter jammed, battery weak, printer too hot
+6e 00 tape ran out, cutter jammed, battery weak, printer too hot
+6f 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot
+70 00 printer too hot
+71 00 no tape, printer too hot
+72 00 tape ran out, printer too hot
+73 00 no tape, tape ran out, printer too hot
+74 00 cutter jammed, printer too hot
+75 00 no tape, cutter jammed, printer too hot
+76 00 tape ran out, cutter jammed, printer too hot
+77 00 no tape, tape ran out, cutter jammed, printer too hot
+78 00 battery weak, printer too hot
+79 00 no tape, battery weak, printer too hot
+7a 00 tape ran out, battery weak, printer too hot
+7b 00 no tape, tape ran out, battery weak, printer too hot
+7c 00 cutter jammed, battery weak, printer too hot
+7d 00 no tape, cutter jammed, battery weak, printer too hot
+7e 00 tape ran out, cutter jammed, battery weak, printer too hot
+7f 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot
+80 00 high voltage adapter
+81 00 no tape, high voltage adapter
+82 00 tape ran out, high voltage adapter
+83 00 no tape, tape ran out, high voltage adapter
+84 00 cutter jammed, high voltage adapter
+85 00 no tape, cutter jammed, high voltage adapter
+86 00 tape ran out, cutter jammed, high voltage adapter
+87 00 no tape, tape ran out, cutter jammed, high voltage adapter
+88 00 battery weak, high voltage adapter
+89 00 no tape, battery weak, high voltage adapter
+8a 00 tape ran out, battery weak, high voltage adapter
+8b 00 no tape, tape ran out, battery weak, high voltage adapter
+8c 00 cutter jammed, battery weak, high voltage adapter
+8d 00 no tape, cutter jammed, battery weak, high voltage adapter
+8e 00 tape ran out, cutter jammed, battery weak, high voltage adapter
+8f 00 no tape, tape ran out, cutter jammed, battery weak, high voltage adapter
+90 00 high voltage adapter
+91 00 no tape, high voltage adapter
+92 00 tape ran out, high voltage adapter
+93 00 no tape, tape ran out, high voltage adapter
+94 00 cutter jammed, high voltage adapter
+95 00 no tape, cutter jammed, high voltage adapter
+96 00 tape ran out, cutter jammed, high voltage adapter
+97 00 no tape, tape ran out, cutter jammed, high voltage adapter
+98 00 battery weak, high voltage adapter
+99 00 no tape, battery weak, high voltage adapter
+9a 00 tape ran out, battery weak, high voltage adapter
+9b 00 no tape, tape ran out, battery weak, high voltage adapter
+9c 00 cutter jammed, battery weak, high voltage adapter
+9d 00 no tape, cutter jammed, battery weak, high voltage adapter
+9e 00 tape ran out, cutter jammed, battery weak, high voltage adapter
+9f 00 no tape, tape ran out, cutter jammed, battery weak, high voltage adapter
+a0 00 high voltage adapter
+a1 00 no tape, high voltage adapter
+a2 00 tape ran out, high voltage adapter
+a3 00 no tape, tape ran out, high voltage adapter
+a4 00 cutter jammed, high voltage adapter
+a5 00 no tape, cutter jammed, high voltage adapter
+a6 00 tape ran out, cutter jammed, high voltage adapter
+a7 00 no tape, tape ran out, cutter jammed, high voltage adapter
+a8 00 battery weak, high voltage adapter
+a9 00 no tape, battery weak, high voltage adapter
+aa 00 tape ran out, battery weak, high voltage adapter
+ab 00 no tape, tape ran out, battery weak, high voltage adapter
+ac 00 cutter jammed, battery weak, high voltage adapter
+ad 00 no tape, cutter jammed, battery weak, high voltage adapter
+ae 00 tape ran out, cutter jammed, battery weak, high voltage adapter
+af 00 no tape, tape ran out, cutter jammed, battery weak, high voltage adapter
+b0 00 high voltage adapter
+b1 00 no tape, high voltage adapter
+b2 00 tape ran out, high voltage adapter
+b3 00 no tape, tape ran out, high voltage adapter
+b4 00 cutter jammed, high voltage adapter
+b5 00 no tape, cutter jammed, high voltage adapter
+b6 00 tape ran out, cutter jammed, high voltage adapter
+b7 00 no tape, tape ran out, cutter jammed, high voltage adapter
+b8 00 battery weak, high voltage adapter
+b9 00 no tape, battery weak, high voltage adapter
+ba 00 tape ran out, battery weak, high voltage adapter
+bb 00 no tape, tape ran out, battery weak, high voltage adapter
+bc 00 cutter jammed, battery weak, high voltage adapter
+bd 00 no tape, cutter jammed, battery weak, high voltage adapter
+be 00 tape ran out, cutter jammed, battery weak, high voltage adapter
+bf 00 no tape, tape ran out, cutter jammed, battery weak, high voltage adapter
+c0 00 printer too hot, high voltage adapter
+c1 00 no tape, printer too hot, high voltage adapter
+c2 00 tape ran out, printer too hot, high voltage adapter
+c3 00 no tape, tape ran out, printer too hot, high voltage adapter
+c4 00 cutter jammed, printer too hot, high voltage adapter
+c5 00 no tape, cutter jammed, printer too hot, high voltage adapter
+c6 00 tape ran out, cutter jammed, printer too hot, high voltage adapter
+c7 00 no tape, tape ran out, cutter jammed, printer too hot, high voltage adapter
+c8 00 battery weak, printer too hot, high voltage adapter
+c9 00 no tape, battery weak, printer too hot, high voltage adapter
+ca 00 tape ran out, battery weak, printer too hot, high voltage adapter
+cb 00 no tape, tape ran out, battery weak, printer too hot, high voltage adapter
+cc 00 cutter jammed, battery weak, printer too hot, high voltage adapter
+cd 00 no tape, cutter jammed, battery weak, printer too hot, high voltage adapter
+ce 00 tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+cf 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+d0 00 printer too hot, high voltage adapter
+d1 00 no tape, printer too hot, high voltage adapter
+d2 00 tape ran out, printer too hot, high voltage adapter
+d3 00 no tape, tape ran out, printer too hot, high voltage adapter
+d4 00 cutter jammed, printer too hot, high voltage adapter
+d5 00 no tape, cutter jammed, printer too hot, high voltage adapter
+d6 00 tape ran out, cutter jammed, printer too hot, high voltage adapter
+d7 00 no tape, tape ran out, cutter jammed, printer too hot, high voltage adapter
+d8 00 battery weak, printer too hot, high voltage adapter
+d9 00 no tape, battery weak, printer too hot, high voltage adapter
+da 00 tape ran out, battery weak, printer too hot, high voltage adapter
+db 00 no tape, tape ran out, battery weak, printer too hot, high voltage adapter
+dc 00 cutter jammed, battery weak, printer too hot, high voltage adapter
+dd 00 no tape, cutter jammed, battery weak, printer too hot, high voltage adapter
+de 00 tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+df 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+e0 00 printer too hot, high voltage adapter
+e1 00 no tape, printer too hot, high voltage adapter
+e2 00 tape ran out, printer too hot, high voltage adapter
+e3 00 no tape, tape ran out, printer too hot, high voltage adapter
+e4 00 cutter jammed, printer too hot, high voltage adapter
+e5 00 no tape, cutter jammed, printer too hot, high voltage adapter
+e6 00 tape ran out, cutter jammed, printer too hot, high voltage adapter
+e7 00 no tape, tape ran out, cutter jammed, printer too hot, high voltage adapter
+e8 00 battery weak, printer too hot, high voltage adapter
+e9 00 no tape, battery weak, printer too hot, high voltage adapter
+ea 00 tape ran out, battery weak, printer too hot, high voltage adapter
+eb 00 no tape, tape ran out, battery weak, printer too hot, high voltage adapter
+ec 00 cutter jammed, battery weak, printer too hot, high voltage adapter
+ed 00 no tape, cutter jammed, battery weak, printer too hot, high voltage adapter
+ee 00 tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+ef 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+f0 00 printer too hot, high voltage adapter
+f1 00 no tape, printer too hot, high voltage adapter
+f2 00 tape ran out, printer too hot, high voltage adapter
+f3 00 no tape, tape ran out, printer too hot, high voltage adapter
+f4 00 cutter jammed, printer too hot, high voltage adapter
+f5 00 no tape, cutter jammed, printer too hot, high voltage adapter
+f6 00 tape ran out, cutter jammed, printer too hot, high voltage adapter
+f7 00 no tape, tape ran out, cutter jammed, printer too hot, high voltage adapter
+f8 00 battery weak, printer too hot, high voltage adapter
+f9 00 no tape, battery weak, printer too hot, high voltage adapter
+fa 00 tape ran out, battery weak, printer too hot, high voltage adapter
+fb 00 no tape, tape ran out, battery weak, printer too hot, high voltage adapter
+fc 00 cutter jammed, battery weak, printer too hot, high voltage adapter
+fd 00 no tape, cutter jammed, battery weak, printer too hot, high voltage adapter
+fe 00 tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+ff 00 no tape, tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter
+00 01 wrong tape
+00 02 
+00 03 wrong tape
+00 04 tape cassette changed
+00 05 wrong tape, tape cassette changed
+00 06 tape cassette changed
+00 07 wrong tape, tape cassette changed
+00 08 
+00 09 wrong tape
+00 0a 
+00 0b wrong tape
+00 0c tape cassette changed
+00 0d wrong tape, tape cassette changed
+00 0e tape cassette changed
+00 0f wrong tape, tape cassette changed
+00 10 cover open
+00 11 wrong tape, cover open
+00 12 cover open
+00 13 wrong tape, cover open
+00 14 tape cassette changed, cover open
+00 15 wrong tape, tape cassette changed, cover open
+00 16 tape cassette changed, cover open
+00 17 wrong tape, tape cassette changed, cover open
+00 18 cover open
+00 19 wrong tape, cover open
+00 1a cover open
+00 1b wrong tape, cover open
+00 1c tape cassette changed, cover open
+00 1d wrong tape, tape cassette changed, cover open
+00 1e tape cassette changed, cover open
+00 1f wrong tape, tape cassette changed, cover open
+00 20 printer overheating
+00 21 wrong tape, printer overheating
+00 22 printer overheating
+00 23 wrong tape, printer overheating
+00 24 tape cassette changed, printer overheating
+00 25 wrong tape, tape cassette changed, printer overheating
+00 26 tape cassette changed, printer overheating
+00 27 wrong tape, tape cassette changed, printer overheating
+00 28 printer overheating
+00 29 wrong tape, printer overheating
+00 2a printer overheating
+00 2b wrong tape, printer overheating
+00 2c tape cassette changed, printer overheating
+00 2d wrong tape, tape cassette changed, printer overheating
+00 2e tape cassette changed, printer overheating
+00 2f wrong tape, tape cassette changed, printer overheating
+00 30 cover open, printer overheating
+00 31 wrong tape, cover open, printer overheating
+00 32 cover open, printer overheating
+00 33 wrong tape, cover open, printer overheating
+00 34 tape cassette changed, cover open, printer overheating
+00 35 wrong tape, tape cassette changed, cover open, printer overheating
+00 36 tape cassette changed, cover open, printer overheating
+00 37 wrong tape, tape cassette changed, cover open, printer overheating
+00 38 cover open, printer overheating
+00 39 wrong tape, cover open, printer overheating
+00 3a cover open, printer overheating
+00 3b wrong tape, cover open, printer overheating
+00 3c tape cassette changed, cover open, printer overheating
+00 3d wrong tape, tape cassette changed, cover open, printer overheating
+00 3e tape cassette changed, cover open, printer overheating
+00 3f wrong tape, tape cassette changed, cover open, printer overheating
+00 40 
+00 41 wrong tape
+00 42 
+00 43 wrong tape
+00 44 tape cassette changed
+00 45 wrong tape, tape cassette changed
+00 46 tape cassette changed
+00 47 wrong tape, tape cassette changed
+00 48 
+00 49 wrong tape
+00 4a 
+00 4b wrong tape
+00 4c tape cassette changed
+00 4d wrong tape, tape cassette changed
+00 4e tape cassette changed
+00 4f wrong tape, tape cassette changed
+00 50 cover open
+00 51 wrong tape, cover open
+00 52 cover open
+00 53 wrong tape, cover open
+00 54 tape cassette changed, cover open
+00 55 wrong tape, tape cassette changed, cover open
+00 56 tape cassette changed, cover open
+00 57 wrong tape, tape cassette changed, cover open
+00 58 cover open
+00 59 wrong tape, cover open
+00 5a cover open
+00 5b wrong tape, cover open
+00 5c tape cassette changed, cover open
+00 5d wrong tape, tape cassette changed, cover open
+00 5e tape cassette changed, cover open
+00 5f wrong tape, tape cassette changed, cover open
+00 60 printer overheating
+00 61 wrong tape, printer overheating
+00 62 printer overheating
+00 63 wrong tape, printer overheating
+00 64 tape cassette changed, printer overheating
+00 65 wrong tape, tape cassette changed, printer overheating
+00 66 tape cassette changed, printer overheating
+00 67 wrong tape, tape cassette changed, printer overheating
+00 68 printer overheating
+00 69 wrong tape, printer overheating
+00 6a printer overheating
+00 6b wrong tape, printer overheating
+00 6c tape cassette changed, printer overheating
+00 6d wrong tape, tape cassette changed, printer overheating
+00 6e tape cassette changed, printer overheating
+00 6f wrong tape, tape cassette changed, printer overheating
+00 70 cover open, printer overheating
+00 71 wrong tape, cover open, printer overheating
+00 72 cover open, printer overheating
+00 73 wrong tape, cover open, printer overheating
+00 74 tape cassette changed, cover open, printer overheating
+00 75 wrong tape, tape cassette changed, cover open, printer overheating
+00 76 tape cassette changed, cover open, printer overheating
+00 77 wrong tape, tape cassette changed, cover open, printer overheating
+00 78 cover open, printer overheating
+00 79 wrong tape, cover open, printer overheating
+00 7a cover open, printer overheating
+00 7b wrong tape, cover open, printer overheating
+00 7c tape cassette changed, cover open, printer overheating
+00 7d wrong tape, tape cassette changed, cover open, printer overheating
+00 7e tape cassette changed, cover open, printer overheating
+00 7f wrong tape, tape cassette changed, cover open, printer overheating
+00 80 
+00 81 wrong tape
+00 82 
+00 83 wrong tape
+00 84 tape cassette changed
+00 85 wrong tape, tape cassette changed
+00 86 tape cassette changed
+00 87 wrong tape, tape cassette changed
+00 88 
+00 89 wrong tape
+00 8a 
+00 8b wrong tape
+00 8c tape cassette changed
+00 8d wrong tape, tape cassette changed
+00 8e tape cassette changed
+00 8f wrong tape, tape cassette changed
+00 90 cover open
+00 91 wrong tape, cover open
+00 92 cover open
+00 93 wrong tape, cover open
+00 94 tape cassette changed, cover open
+00 95 wrong tape, tape cassette changed, cover open
+00 96 tape cassette changed, cover open
+00 97 wrong tape, tape cassette changed, cover open
+00 98 cover open
+00 99 wrong tape, cover open
+00 9a cover open
+00 9b wrong tape, cover open
+00 9c tape cassette changed, cover open
+00 9d wrong tape, tape cassette changed, cover open
+00 9e tape cassette changed, cover open
+00 9f wrong tape, tape cassette changed, cover open
+00 a0 printer overheating
+00 a1 wrong tape, printer overheating
+00 a2 printer overheating
+00 a3 wrong tape, printer overheating
+00 a4 tape cassette changed, printer overheating
+00 a5 wrong tape, tape cassette changed, printer overheating
+00 a6 tape cassette changed, printer overheating
+00 a7 wrong tape, tape cassette changed, printer overheating
+00 a8 printer overheating
+00 a9 wrong tape, printer overheating
+00 aa printer overheating
+00 ab wrong tape, printer overheating
+00 ac tape cassette changed, printer overheating
+00 ad wrong tape, tape cassette changed, printer overheating
+00 ae tape cassette changed, printer overheating
+00 af wrong tape, tape cassette changed, printer overheating
+00 b0 cover open, printer overheating
+00 b1 wrong tape, cover open, printer overheating
+00 b2 cover open, printer overheating
+00 b3 wrong tape, cover open, printer overheating
+00 b4 tape cassette changed, cover open, printer overheating
+00 b5 wrong tape, tape cassette changed, cover open, printer overheating
+00 b6 tape cassette changed, cover open, printer overheating
+00 b7 wrong tape, tape cassette changed, cover open, printer overheating
+00 b8 cover open, printer overheating
+00 b9 wrong tape, cover open, printer overheating
+00 ba cover open, printer overheating
+00 bb wrong tape, cover open, printer overheating
+00 bc tape cassette changed, cover open, printer overheating
+00 bd wrong tape, tape cassette changed, cover open, printer overheating
+00 be tape cassette changed, cover open, printer overheating
+00 bf wrong tape, tape cassette changed, cover open, printer overheating
+00 c0 
+00 c1 wrong tape
+00 c2 
+00 c3 wrong tape
+00 c4 tape cassette changed
+00 c5 wrong tape, tape cassette changed
+00 c6 tape cassette changed
+00 c7 wrong tape, tape cassette changed
+00 c8 
+00 c9 wrong tape
+00 ca 
+00 cb wrong tape
+00 cc tape cassette changed
+00 cd wrong tape, tape cassette changed
+00 ce tape cassette changed
+00 cf wrong tape, tape cassette changed
+00 d0 cover open
+00 d1 wrong tape, cover open
+00 d2 cover open
+00 d3 wrong tape, cover open
+00 d4 tape cassette changed, cover open
+00 d5 wrong tape, tape cassette changed, cover open
+00 d6 tape cassette changed, cover open
+00 d7 wrong tape, tape cassette changed, cover open
+00 d8 cover open
+00 d9 wrong tape, cover open
+00 da cover open
+00 db wrong tape, cover open
+00 dc tape cassette changed, cover open
+00 dd wrong tape, tape cassette changed, cover open
+00 de tape cassette changed, cover open
+00 df wrong tape, tape cassette changed, cover open
+00 e0 printer overheating
+00 e1 wrong tape, printer overheating
+00 e2 printer overheating
+00 e3 wrong tape, printer overheating
+00 e4 tape cassette changed, printer overheating
+00 e5 wrong tape, tape cassette changed, printer overheating
+00 e6 tape cassette changed, printer overheating
+00 e7 wrong tape, tape cassette changed, printer overheating
+00 e8 printer overheating
+00 e9 wrong tape, printer overheating
+00 ea printer overheating
+00 eb wrong tape, printer overheating
+00 ec tape cassette changed, printer overheating
+00 ed wrong tape, tape cassette changed, printer overheating
+00 ee tape cassette changed, printer overheating
+00 ef wrong tape, tape cassette changed, printer overheating
+00 f0 cover open, printer overheating
+00 f1 wrong tape, cover open, printer overheating
+00 f2 cover open, printer overheating
+00 f3 wrong tape, cover open, printer overheating
+00 f4 tape cassette changed, cover open, printer overheating
+00 f5 wrong tape, tape cassette changed, cover open, printer overheating
+00 f6 tape cassette changed, cover open, printer overheating
+00 f7 wrong tape, tape cassette changed, cover open, printer overheating
+00 f8 cover open, printer overheating
+00 f9 wrong tape, cover open, printer overheating
+00 fa cover open, printer overheating
+00 fb wrong tape, cover open, printer overheating
+00 fc tape cassette changed, cover open, printer overheating
+00 fd wrong tape, tape cassette changed, cover open, printer overheating
+00 fe tape cassette changed, cover open, printer overheating
+00 ff wrong tape, tape cassette changed, cover open, printer overheating
+ff ff no tape, tape ran out, cutter jammed, battery weak, printer too hot, high voltage adapter, wrong tape, tape cassette changed, cover open, printer overheating

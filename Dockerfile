@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# The command server. The board's binary is built with make, not here.
+# The command server. The boards' firmware is built by firmware/Makefile, not here.
 
 FROM golang:1.26-alpine AS build
 WORKDIR /src
