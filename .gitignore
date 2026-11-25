@@ -9,7 +9,7 @@ bin/
 CLAUDE.md
 
 # Local docs, which may hold private details.
-docs/
+/docs/
 
 # The real board config; config.example.toml is the one to commit.
 config.toml
