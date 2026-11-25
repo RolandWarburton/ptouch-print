@@ -7,6 +7,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "ptp700_proto.h"
 #include "usb_io.h"
 
 static const char *TAG = "ptp700";
@@ -19,17 +20,11 @@ static const char *TAG = "ptp700";
 #define POLL_MS 50 // between reads while the printer is quiet
 #define MAX_DRAIN 32
 
-esp_err_t pt_open(pt_t *p, const usb_printer_t *usb)
-{
-    *p = (pt_t){.usb = usb};
-    return usb_host_transfer_alloc(XFER_BYTES, 0, &p->t);
-}
-
-void pt_close(pt_t *p)
-{
-    usb_host_transfer_free(p->t);
-    p->t = NULL;
-}
+typedef struct {
+    usb_printer_t usb;
+    usb_transfer_t *t;
+    char err[200]; // says what's wrong after a failure
+} pt_t;
 
 static const char *fail(pt_t *p, const char *code, const char *why)
 {
@@ -37,7 +32,7 @@ static const char *fail(pt_t *p, const char *code, const char *why)
     return code;
 }
 
-static esp_err_t send(pt_t *p, size_t n) { return usb_io_xfer(p->usb->dev, p->t, p->usb->ep_out, n, WRITE_MS); }
+static esp_err_t send(pt_t *p, size_t n) { return usb_io_xfer(p->usb.dev, p->t, p->usb.ep_out, n, WRITE_MS); }
 
 // Reads a status message. While it has nothing to say the printer answers with
 // empty packets. ESP_ERR_TIMEOUT when none came in time.
@@ -46,7 +41,7 @@ static esp_err_t read_status(pt_t *p, int64_t deadline, pt_status_t *s)
     uint8_t msg[PT_STATUS_LEN];
     size_t got = 0;
     while (got < sizeof msg) {
-        esp_err_t err = usb_io_xfer(p->usb->dev, p->t, p->usb->ep_in, 64, READ_MS);
+        esp_err_t err = usb_io_xfer(p->usb.dev, p->t, p->usb.ep_in, 64, READ_MS);
         if (err != ESP_OK && err != ESP_ERR_TIMEOUT) {
             return err;
         }
@@ -68,11 +63,11 @@ static esp_err_t read_status(pt_t *p, int64_t deadline, pt_status_t *s)
 
 static int64_t after_ms(int ms) { return esp_timer_get_time() + (int64_t)ms * 1000; }
 
-const char *pt_status(pt_t *p, pt_status_t *s)
+static const char *ask_status(pt_t *p, pt_status_t *s)
 {
     // Messages left from an earlier job mustn't pass for the answer.
     for (int i = 0; i < MAX_DRAIN; i++) {
-        esp_err_t err = usb_io_xfer(p->usb->dev, p->t, p->usb->ep_in, 64, READ_MS);
+        esp_err_t err = usb_io_xfer(p->usb.dev, p->t, p->usb.ep_in, 64, READ_MS);
         if (err != ESP_OK || p->t->actual_num_bytes == 0) {
             break;
         }
@@ -94,7 +89,7 @@ const char *pt_status(pt_t *p, pt_status_t *s)
 // Streams the job.
 static esp_err_t send_job(pt_t *p, const pt_tape_t *tape, uint8_t media_type, const uint8_t *rows, uint32_t lines)
 {
-    const size_t row_bytes = (tape->dots + 7) / 8;
+    const size_t row_bytes = raster_row_bytes(tape->dots);
     uint8_t *buf = p->t->data_buffer;
     pt_job_header(buf, tape, media_type, lines);
     size_t n = PT_HEADER_LEN;
@@ -117,28 +112,42 @@ static esp_err_t send_job(pt_t *p, const pt_tape_t *tape, uint8_t media_type, co
     return send(p, n);
 }
 
-const char *pt_print(pt_t *p, uint8_t tape_mm, const uint8_t *rows, uint32_t lines)
+// Checks the printer can print, and finds out its tape.
+static const char *loaded_tape(pt_t *p, pt_status_t *s, const pt_tape_t **tape)
 {
-    pt_status_t s;
-    const char *code = pt_status(p, &s);
+    const char *code = ask_status(p, s);
     if (*code) {
         return code;
     }
-    if (s.e1 || s.e2) {
-        pt_errors(&s, p->err, sizeof p->err);
+    if (s->e1 || s->e2) {
+        pt_errors(s, p->err, sizeof p->err);
         return CODE_PRINTER_ERROR;
     }
-    const pt_tape_t *tape = pt_tape(s.tape_mm);
-    if (!tape) {
-        snprintf(p->err, sizeof p->err, "unsupported tape width %u mm", s.tape_mm);
+    *tape = pt_tape(s->tape_mm);
+    if (!*tape) {
+        snprintf(p->err, sizeof p->err, "unsupported tape width %u mm", s->tape_mm);
         return CODE_UNSUPPORTED_TAPE;
     }
-    if (s.tape_mm != tape_mm) {
-        snprintf(p->err, sizeof p->err, "the label is for %u mm tape but %u mm is loaded", tape_mm, s.tape_mm);
-        return CODE_TAPE_MISMATCH;
+    return CODE_OK;
+}
+
+static const char *print(pt_t *p, const raster_t *l)
+{
+    pt_status_t s;
+    const pt_tape_t *tape;
+    const char *code = loaded_tape(p, &s, &tape);
+    if (*code) {
+        return code;
+    }
+    if (strcmp(l->media, tape->media)) {
+        snprintf(p->err, sizeof p->err, "the label is for %s but %s is loaded", l->media, tape->media);
+        return CODE_WRONG_MEDIA;
+    }
+    if (l->dots != tape->dots) {
+        return fail(p, CODE_WRONG_HEIGHT, "the label isn't as tall as the tape's printable area");
     }
 
-    esp_err_t err = send_job(p, tape, s.media_type, rows, lines);
+    esp_err_t err = send_job(p, tape, s.media_type, l->data, l->rows);
     if (err != ESP_OK) {
         snprintf(p->err, sizeof p->err, "lost the printer while printing: %s", esp_err_to_name(err));
         return CODE_UNCONFIRMED;
@@ -165,3 +174,50 @@ const char *pt_print(pt_t *p, uint8_t tape_mm, const uint8_t *rows, uint32_t lin
         }
     }
 }
+
+// ---- Driver -----------------------------------------------------------------
+
+static pt_t s_p;
+
+static esp_err_t driver_open(const usb_printer_t *usb)
+{
+    s_p = (pt_t){.usb = *usb};
+    return usb_host_transfer_alloc(XFER_BYTES, 0, &s_p.t);
+}
+
+static void driver_close(void)
+{
+    usb_host_transfer_free(s_p.t);
+    s_p.t = NULL;
+}
+
+static const char *driver_state(const char **media)
+{
+    pt_status_t s;
+    const pt_tape_t *tape;
+    const char *code = loaded_tape(&s_p, &s, &tape);
+    if (!*code) {
+        *media = tape->media;
+    }
+    return code;
+}
+
+static const char *driver_print(const raster_t *l) { return print(&s_p, l); }
+
+static const char *driver_error(void) { return s_p.err; }
+
+extern const uint8_t sample_start[] asm("_binary_sample_rows_start");
+extern const uint8_t sample_end[] asm("_binary_sample_rows_end");
+
+static const usb_id_t ids[] = {{0x04f9, 0x2061}};
+
+const driver_t ptp700_driver = {
+    .ids = ids,
+    .n_ids = sizeof ids / sizeof ids[0],
+    .sample = {"tape-24", 128, sample_start, sample_end},
+    .open = driver_open,
+    .close = driver_close,
+    .state = driver_state,
+    .print = driver_print,
+    .error = driver_error,
+};

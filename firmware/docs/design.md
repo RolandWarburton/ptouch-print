@@ -84,9 +84,7 @@ print, it sends `media=` empty and `problem=<code>`, and may add `wifi=<name>`.
 Each device type has its own firmware in `apps/`, made of a driver and the shared
 `components/`:
 
-- `label`: draws text and Code 128 on a canvas and produces the head's raster
-  rows, with the media table and lookup by id. Plain C, runs on a development
-  machine.
+- `diecut`: the LabelWriters' media table and lookup. Plain C.
 - `usb_printer`: finds the app's printer by its USB ids; `usb_io` runs one bulk
   transfer with a timeout.
 - `board`: calls the app's `driver_t`. Still only prints samples; to come are
@@ -96,8 +94,8 @@ Each device type has its own firmware in `apps/`, made of a driver and the share
 `apps/lw450` and `apps/lw550` have the drivers; `dymo550_proto` is the 550's parsing,
 in plain C.
 
-Print flow for a job: check the job's media against the loaded media, draw the
-label, check the printer is idle, stream it, read the status, report the
+Print flow for a job: check the job's media against the loaded media,
+check the printer is idle, stream it, read the status, report the
 result. A job that fails or might have printed is not retried.
 
 ## Order of work

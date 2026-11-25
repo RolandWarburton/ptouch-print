@@ -32,6 +32,7 @@ void pt_errors(const pt_status_t *s, char *out, size_t cap);
 // The printable area of a tape width: dots across the tape, and the print head's
 // unused pins before them.
 typedef struct {
+    const char *media; // the server's id
     uint8_t mm, dots, margin;
 } pt_tape_t;
 

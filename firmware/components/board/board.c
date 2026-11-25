@@ -1,5 +1,6 @@
 #include "board.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "esp_heap_caps.h"
@@ -23,41 +24,31 @@ static void log_memory(const char *when)
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM), (unsigned)uxTaskGetStackHighWaterMark(NULL));
 }
 
-// Waits a while for a key that asks for a sample label, so that a reset alone
+// Waits a while for a key that asks for the sample label, so that a reset alone
 // never uses one up.
-static int wait_for_key(void)
+static bool sample_wanted(void)
 {
-    ESP_LOGI(TAG, "press t for a text sample or b for a barcode sample, within %d s", KEY_WAIT_MS / 1000);
+    ESP_LOGI(TAG, "press t for a sample label, within %d s", KEY_WAIT_MS / 1000);
     for (int waited = 0; waited < KEY_WAIT_MS; waited += 50) {
         vTaskDelay(pdMS_TO_TICKS(50));
-        int key = getchar();
-        if (key == 't' || key == 'b') {
-            return key;
+        if (getchar() == 't') {
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
-static void print_sample(const media_t *media, int key)
+static void print_sample(void)
 {
-    label_t l;
-    label_err_t err = label_init(&l, media, key == 't' ? ORIENT_PORTRAIT : ORIENT_LANDSCAPE);
-    if (err == LABEL_OK) {
-        const char *lines[] = {"ESP32 OK", s_driver->sample};
-        err = key == 't' ? label_text(&l, lines, 2, SIZE_MEDIUM, ALIGN_LEFT) : label_barcode(&l, s_driver->sample);
-    }
-    if (err != LABEL_OK) {
-        ESP_LOGE(TAG, "can't draw the label: %s", l.err);
+    const sample_t *s = &s_driver->sample;
+    const raster_t r = {s->media, s->dots, (s->end - s->start) / raster_row_bytes(s->dots), s->start};
+    const char *code = s_driver->print(&r);
+    if (*code) {
+        ESP_LOGE(TAG, "%s: %s", code, s_driver->error());
     } else {
-        log_memory("with the label drawn");
-        const char *code = s_driver->print(&l);
-        if (*code) {
-            ESP_LOGE(TAG, "%s: %s", code, s_driver->error());
-        } else {
-            ESP_LOGI(TAG, "label printed");
-        }
+        ESP_LOGI(TAG, "label printed");
     }
-    label_free(&l);
+    log_memory("after printing");
 }
 
 static void attached(const usb_printer_t *p)
@@ -66,15 +57,14 @@ static void attached(const usb_printer_t *p)
         ESP_LOGE(TAG, "can't open the printer: out of memory");
         return;
     }
-    const media_t *media;
+    const char *media;
     const char *code = s_driver->state(&media);
     if (*code) {
         ESP_LOGE(TAG, "%s: %s", code, s_driver->error());
     } else {
-        ESP_LOGI(TAG, "loaded: %s (%s)", media->id, media->name);
-        int key = wait_for_key();
-        if (key) {
-            print_sample(media, key);
+        ESP_LOGI(TAG, "loaded: %s", media);
+        if (sample_wanted()) {
+            print_sample();
         }
     }
     s_driver->close();

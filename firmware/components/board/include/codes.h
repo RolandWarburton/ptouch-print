@@ -12,4 +12,5 @@
 #define CODE_UNCONFIRMED "unconfirmed" // may have printed
 #define CODE_UNSUPPORTED_MEDIA "unsupported_media"
 #define CODE_UNSUPPORTED_TAPE "unsupported_tape"
+#define CODE_WRONG_HEIGHT "wrong_height"
 #define CODE_WRONG_MEDIA "wrong_media"

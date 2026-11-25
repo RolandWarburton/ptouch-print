@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "media.h"
 #include "sdkconfig.h"
 #include "usb_io.h"
 
@@ -53,7 +54,7 @@ static esp_err_t ask_status(uint8_t *status)
 }
 
 // Checks the printer is idle. It can't say which labels it has, so they're a setting.
-static const char *state(const media_t **media)
+static const char *loaded(const media_t **media)
 {
     uint8_t status;
     if (ask_status(&status) != ESP_OK) {
@@ -68,9 +69,9 @@ static const char *state(const media_t **media)
 }
 
 // Streams a label to the printer in batches of rows.
-static esp_err_t send_label(const label_t *l)
+static esp_err_t send_label(const raster_t *l, const media_t *media)
 {
-    const int rows = l->media->length;
+    const size_t row_bytes = raster_row_bytes(l->dots);
 
     // Reset, then set up the page: dot tab 0, bytes per line, normal density,
     // 300x300 dpi, label length in 1/300 in.
@@ -82,15 +83,16 @@ static esp_err_t send_label(const label_t *l)
     p += sizeof setup;
     *p++ = 0x1b;
     *p++ = 0x4c;
-    *p++ = l->media->pitch >> 8;
-    *p++ = l->media->pitch & 0xff;
+    *p++ = media->pitch >> 8;
+    *p++ = media->pitch & 0xff;
     esp_err_t err = send(p - s_t->data_buffer);
 
-    for (int y = 0; err == ESP_OK && y < rows;) {
+    for (uint32_t y = 0; err == ESP_OK && y < l->rows;) {
         p = s_t->data_buffer;
-        for (int n = 0; n < ROWS_PER_XFER && y < rows; n++, y++) {
+        for (int n = 0; n < ROWS_PER_XFER && y < l->rows; n++, y++) {
             *p++ = 0x16; // SYN: one raster row follows
-            label_head_row(l, y, p);
+            memset(p, 0, HEAD_BYTES);
+            memcpy(p, l->data + y * row_bytes, row_bytes);
             p += HEAD_BYTES;
         }
         err = send(p - s_t->data_buffer);
@@ -103,18 +105,21 @@ static esp_err_t send_label(const label_t *l)
     return err;
 }
 
-static const char *print(const label_t *l)
+static const char *print(const raster_t *l)
 {
-    const media_t *loaded;
-    const char *code = state(&loaded);
+    const media_t *media;
+    const char *code = loaded(&media);
     if (*code) {
         return code;
     }
-    if (loaded != l->media) {
-        snprintf(s_err, sizeof s_err, "the label is for %s but %s is loaded", l->media->id, loaded->id);
+    if (strcmp(l->media, media->id)) {
+        snprintf(s_err, sizeof s_err, "the label is for %s but %s is loaded", l->media, media->id);
         return CODE_WRONG_MEDIA;
     }
-    esp_err_t err = send_label(l);
+    if (l->dots != media->width || l->rows != media->length) {
+        return fail(CODE_WRONG_HEIGHT, "the label isn't the size of the labels loaded");
+    }
+    esp_err_t err = send_label(l, media);
     if (err != ESP_OK) {
         snprintf(s_err, sizeof s_err, "lost the printer while printing: %s", esp_err_to_name(err));
         return CODE_UNCONFIRMED;
@@ -143,14 +148,27 @@ static void driver_close(void)
     s_t = NULL;
 }
 
+static const char *state(const char **media)
+{
+    const media_t *m;
+    const char *code = loaded(&m);
+    if (!*code) {
+        *media = m->id;
+    }
+    return code;
+}
+
 static const char *error(void) { return s_err; }
+
+extern const uint8_t sample_start[] asm("_binary_sample_rows_start");
+extern const uint8_t sample_end[] asm("_binary_sample_rows_end");
 
 static const usb_id_t ids[] = {{0x0922, 0x0020}};
 
 const driver_t dymo450_driver = {
     .ids = ids,
     .n_ids = sizeof ids / sizeof ids[0],
-    .sample = "Dymo 450",
+    .sample = {"large-address", 400, sample_start, sample_end},
     .open = driver_open,
     .close = driver_close,
     .state = state,

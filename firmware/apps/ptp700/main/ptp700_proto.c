@@ -46,7 +46,7 @@ void pt_errors(const pt_status_t *s, char *out, size_t cap)
     add(out, cap, error2, sizeof error2 / sizeof error2[0], s->e2);
 }
 
-static const pt_tape_t tapes[] = {{12, 70, 29}, {24, 128, 0}};
+static const pt_tape_t tapes[] = {{"tape-12", 12, 70, 29}, {"tape-24", 24, 128, 0}};
 
 const pt_tape_t *pt_tape(uint8_t mm)
 {

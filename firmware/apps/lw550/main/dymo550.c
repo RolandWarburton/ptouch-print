@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "media.h"
 #include "usb_io.h"
 
 static const char *TAG = "dymo550";
@@ -108,14 +109,13 @@ static const char *loaded_media(lw5_t *p, lw5_status_t *s, const media_t **media
 }
 
 // Sends everything up to the raster's last row.
-static esp_err_t send_label(lw5_t *p, const label_t *l)
+static esp_err_t send_label(lw5_t *p, const raster_t *l)
 {
     static uint32_t job;
     job++;
-    const int rows = l->media->length;
-    const int row_bytes = (l->media->width + 7) / 8;
+    const size_t row_bytes = raster_row_bytes(l->dots);
     uint8_t header[LW5_HEADER_LEN];
-    lw5_raster_header(header, rows, row_bytes * 8);
+    lw5_raster_header(header, l->rows, row_bytes * 8);
 
     esp_err_t err = SEND(p, 0x1b, 0x73, job, job >> 8, job >> 16, job >> 24); // ESC s: start the job
     if (err == ESP_OK) {
@@ -130,19 +130,16 @@ static esp_err_t send_label(lw5_t *p, const label_t *l)
     if (err == ESP_OK) {
         err = send(p, header, sizeof header);
     }
-    for (int y = 0; err == ESP_OK && y < rows;) {
-        size_t n = 0;
-        for (; y < rows && n + row_bytes <= XFER_BYTES; y++, n += row_bytes) {
-            uint8_t row[HEAD_BYTES];
-            label_head_row(l, y, row);
-            memcpy(p->t->data_buffer + n, row, row_bytes);
-        }
-        err = usb_io_xfer(p->usb.dev, p->t, p->usb.ep_out, n, PRINT_MS);
+    const size_t size = l->rows * row_bytes;
+    for (size_t sent = 0; err == ESP_OK && sent < size;) {
+        size_t n = size - sent < XFER_BYTES ? size - sent : XFER_BYTES;
+        err = send(p, l->data + sent, n);
+        sent += n;
     }
     return err;
 }
 
-static const char *print(lw5_t *p, const label_t *l)
+static const char *print(lw5_t *p, const raster_t *l)
 {
     lw5_status_t s;
     const char *code = acquire(p, &s);
@@ -151,9 +148,11 @@ static const char *print(lw5_t *p, const label_t *l)
     }
     const media_t *loaded;
     code = media_from(p, &s, &loaded);
-    if (*code == 0 && loaded != l->media) {
-        snprintf(p->err, sizeof p->err, "the label is for %s but %s is loaded", l->media->id, loaded->id);
+    if (*code == 0 && strcmp(l->media, loaded->id)) {
+        snprintf(p->err, sizeof p->err, "the label is for %s but %s is loaded", l->media, loaded->id);
         code = CODE_WRONG_MEDIA;
+    } else if (*code == 0 && (l->dots != loaded->width || l->rows != loaded->length)) {
+        code = fail(p, CODE_WRONG_HEIGHT, "the label isn't the size of the labels loaded");
     }
     if (*code) {
         release(p);
@@ -209,15 +208,23 @@ static void driver_close(void)
     s_p.t = NULL;
 }
 
-static const char *driver_state(const media_t **media)
+static const char *driver_state(const char **media)
 {
     lw5_status_t s;
-    return loaded_media(&s_p, &s, media);
+    const media_t *m;
+    const char *code = loaded_media(&s_p, &s, &m);
+    if (!*code) {
+        *media = m->id;
+    }
+    return code;
 }
 
-static const char *driver_print(const label_t *l) { return print(&s_p, l); }
+static const char *driver_print(const raster_t *l) { return print(&s_p, l); }
 
 static const char *driver_error(void) { return s_p.err; }
+
+extern const uint8_t sample_start[] asm("_binary_sample_rows_start");
+extern const uint8_t sample_end[] asm("_binary_sample_rows_end");
 
 static const usb_id_t ids[] = {
     {0x0922, 0x0028}, // LabelWriter 550, not tried
@@ -227,7 +234,7 @@ static const usb_id_t ids[] = {
 const driver_t dymo550_driver = {
     .ids = ids,
     .n_ids = sizeof ids / sizeof ids[0],
-    .sample = "Dymo 550",
+    .sample = {"large-address", 400, sample_start, sample_end},
     .open = driver_open,
     .close = driver_close,
     .state = driver_state,

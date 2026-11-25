@@ -4,5 +4,5 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 
-# Room on the main task's stack for the label drawing buffers.
+# Room on the main task's stack.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

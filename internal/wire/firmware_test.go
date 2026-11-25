@@ -63,7 +63,7 @@ func TestFirmwareCodes(t *testing.T) {
 
 func TestFirmwareMedia(t *testing.T) {
 	rows := regexp.MustCompile(`const media_t MEDIA_\w+ = \{"([^"]+)", "([^"]+)", (\d+), (\d+), (\d+)`).
-		FindAllStringSubmatch(readFirmware(t, "components/label/label.c"), -1)
+		FindAllStringSubmatch(readFirmware(t, "components/diecut/media.c"), -1)
 	firmware := map[string]Media{}
 	for _, r := range rows {
 		n := func(s string) int { i, _ := strconv.Atoi(s); return i }
@@ -83,5 +83,21 @@ func TestFirmwareMedia(t *testing.T) {
 	}
 	if labels == 0 || len(firmware) != labels {
 		t.Errorf("%d kinds of die-cut labels here, %d in the firmware", labels, len(firmware))
+	}
+}
+
+func TestFirmwareTapes(t *testing.T) {
+	rows := regexp.MustCompile(`\{"(tape-\d+)", (\d+), (\d+), (\d+)\}`).
+		FindAllStringSubmatch(readFirmware(t, "apps/ptp700/main/ptp700_proto.c"), -1)
+	if len(rows) != len(tapes) {
+		t.Errorf("%d tapes here, %d in the firmware", len(tapes), len(rows))
+	}
+	for _, r := range rows {
+		n := func(s string) int { i, _ := strconv.Atoi(s); return i }
+		m, ok := FindMedia(FamilyPTouch, r[1])
+		spec := tapes[n(r[2])]
+		if !ok || m.TapeMM != spec.MM || spec.Dots != n(r[3]) || spec.Margin != n(r[4]) {
+			t.Errorf("the firmware has %v, want %+v", r[0], spec)
+		}
 	}
 }

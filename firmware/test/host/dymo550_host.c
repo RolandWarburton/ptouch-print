@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "dymo550_proto.h"
-#include "label.h"
+#include "media.h"
 
 int main(void)
 {

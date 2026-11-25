@@ -38,7 +38,7 @@ monitor: need-app
 size: need-app
 	$(DOCKER) $(IMAGE) idf.py size
 
-# Draws labels with the label module on this machine, into test/out/ as PBM and PNG.
+# Checks of the plain C parts, on this machine.
 host-test:
 	./test/host/run.sh
 

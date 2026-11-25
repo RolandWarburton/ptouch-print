@@ -38,8 +38,10 @@ implemented, so timeouts are ours to handle.
 
 ## Verified on a LabelWriter 550 Turbo
 
-Checked 2026-11-25 with S0722400 labels: one portrait text label and one
-landscape barcode, each its own job.
+Checked 2026-11-25 with S0722400 labels: two portrait text labels and one
+landscape barcode, each its own job. The barcode, `ESP32 / Dymo 550`, can't have been
+right: the firmware's Code 128 pattern for a space was wrong then. The server draws
+barcodes now.
 
 - VID `0x0922`, PID `0x0029`, one printer-class interface (class 7, subclass 1,
   protocol 2), bulk OUT `0x02`, bulk IN `0x82`, 64-byte packets.
