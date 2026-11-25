@@ -165,11 +165,7 @@ func token(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
-		where := "put it in the board's settings"
-		if p.Family == wire.FamilyPTouch {
-			where = "put it in /etc/ptouch-print-board/token on the board, mode 0600"
-		}
-		fmt.Printf("Board token for %s (%s):\n  %s\n\n", p.Name, where, tok)
+		fmt.Printf("Board token for %s (put it in the board's settings):\n  %s\n\n", p.Name, tok)
 		fmt.Printf("Add to PRINT_PRINTERS (comma-separated):\n  %s:%s:%s\n", p.Name, p.Family, p.TokenHash)
 		return
 	}

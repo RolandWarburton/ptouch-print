@@ -1,5 +1,5 @@
-// Host-side check of the PT-P700's status parsing, against the rules in
-// internal/ptouch/status.go.
+// Host-side check of the PT-P700's status parsing, against what the Go driver it
+// replaces made of the same bytes (test/golden/ptp700).
 
 #undef NDEBUG
 #include <assert.h>
@@ -26,9 +26,21 @@ int main(void)
     pt_errors(&s, errors, sizeof errors);
     assert(!strcmp(errors, "no tape, cover open"));
 
-    s.e1 = s.e2 = 0xff; // every message fits
-    pt_errors(&s, errors, sizeof errors);
-    assert(!strcmp(errors + strlen(errors) - 19, "printer overheating"));
+    FILE *f = fopen("test/golden/ptp700/errors.txt", "r");
+    assert(f);
+    char line[256];
+    int n = 0;
+    for (; fgets(line, sizeof line, f); n++) {
+        unsigned e1, e2;
+        line[strcspn(line, "\n")] = 0;
+        assert(sscanf(line, "%2x %2x", &e1, &e2) == 2);
+        s.e1 = e1;
+        s.e2 = e2;
+        pt_errors(&s, errors, sizeof errors);
+        assert(!strcmp(errors, line + 6));
+    }
+    fclose(f);
+    assert(n == 512);
 
     assert(!pt_parse_status(b, 31, &s));
     b[0] = 0;
@@ -41,6 +53,6 @@ int main(void)
     }
     assert(!memcmp(r + 100, "\x1b\x40\x1b\x69\x53", 5));
 
-    puts("ptp700: status parsing follows the Go code");
+    puts("ptp700: status parsing matches the Go driver");
     return 0;
 }

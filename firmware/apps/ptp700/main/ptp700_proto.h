@@ -1,5 +1,5 @@
 // The PT-P700's status reply. Plain C with no ESP-IDF calls, so it builds and
-// runs on a development machine. It mirrors internal/ptouch/status.go.
+// runs on a development machine. test/golden/ptp700 checks it.
 #pragma once
 
 #include <stdbool.h>
