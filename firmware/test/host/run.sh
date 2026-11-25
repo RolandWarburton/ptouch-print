@@ -13,7 +13,7 @@ test/out/dymo550_host
 gcc -Wall -Wextra -Iapps/ptp700/main -o test/out/ptp700_host test/host/ptp700_host.c apps/ptp700/main/ptp700_proto.c
 test/out/ptp700_host
 
-SAMPLES="TG17573 12345678 1234567 123 Hello_123 ab12345cd 99887766abcd"
+SAMPLES="1234001234 00000000 TG17573 12345678 1234567 123 Hello_123 ab12345cd 99887766abcd"
 (cd tools/code128ref && go run . $SAMPLES) > test/out/code128.expected
 test/out/label_host modules $SAMPLES > test/out/code128.actual
 diff test/out/code128.expected test/out/code128.actual && echo "code128: bars match the Go encoder"

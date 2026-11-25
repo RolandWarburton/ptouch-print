@@ -36,8 +36,8 @@ type Options struct {
 //	GET  /api/status                                     client: each printer: is it online, what's loaded
 //	POST /mcp                                            client: MCP Streamable HTTP, stateless
 //
-// A board's token says which printer it is. A P-touch board may send tape_mm=N
-// in place of media.
+// A board's token says which printer it is. The old Raspberry Pi sends tape_mm=N in
+// place of media, and draws its labels itself.
 //
 // With WebUI, also the page at / and /static/, and sign-in at /auth/*; /api/*
 // then accepts a signed-in browser's session cookie too.
@@ -128,7 +128,9 @@ func (h handlers) next(w http.ResponseWriter, r *http.Request) {
 		writeError(w, refuse(http.StatusBadRequest, "bad_request", "problem must be a lower-case code like editor_lite"))
 		return
 	}
-	job, err := h.svc.Next(r.Context(), boardPrinter(r), Poll{Media: media, Problem: problem, WiFi: wifiName(q.Get(wire.WiFiParam))})
+	job, err := h.svc.Next(r.Context(), boardPrinter(r), Poll{
+		Media: media, Problem: problem, WiFi: wifiName(q.Get(wire.WiFiParam)), Draws: !q.Has(wire.MediaParam),
+	})
 	switch {
 	case err != nil:
 		writeError(w, err)

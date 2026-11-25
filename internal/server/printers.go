@@ -73,6 +73,7 @@ type Poll struct {
 	Media   string
 	Problem string
 	WiFi    string
+	Draws   bool // the board draws its labels itself: the old Raspberry Pi
 }
 
 // printerState is a printer and its board's last poll. The Service's mutex

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"testing"
@@ -51,8 +53,13 @@ func TestJobsGoToTheirPrinter(t *testing.T) {
 		t.Fatalf("the P-touch got the LabelWriter's job: %d", code)
 	}
 	code, sent := e.pollDymo("media=large-address")
-	if code != 200 || sent["text"] != "TG17573" || sent["media"] != "large-address" || sent["orientation"] != "portrait" {
-		t.Fatalf("poll: %d %v", code, sent)
+	if r := raster(sent); code != 200 || sent["id"] != 1.0 || sent["text"] != nil || r["media"] != "large-address" ||
+		r["dots"] != 400.0 || r["rows"] != 950.0 {
+		t.Fatalf("poll: %d, raster %v x %v for %v", code, r["dots"], r["rows"], r["media"])
+	}
+	if data, err := base64.StdEncoding.DecodeString(raster(sent)["data"].(string)); err != nil || len(data) != 950*50 ||
+		bytes.Count(data, []byte{0}) == len(data) {
+		t.Fatalf("raster data: %d bytes, %v", len(data), err)
 	}
 	if code, body := e.do("POST", wire.ResultPath(1), boardToken, wire.Result{Printed: true}); code != 404 {
 		t.Errorf("the P-touch reported the LabelWriter's job: %d %v", code, body)
@@ -62,6 +69,81 @@ func TestJobsGoToTheirPrinter(t *testing.T) {
 	}
 	if code, _ := e.do("GET", "/api/status", dymoToken, nil); code != 401 {
 		t.Errorf("a board token on the client API: %d", code)
+	}
+}
+
+// raster is the drawn label in a job a board got, or nil.
+func raster(job map[string]any) map[string]any {
+	r, _ := job["raster"].(map[string]any)
+	return r
+}
+
+// What was true when a job was submitted is checked again when its board asks.
+func TestDrawnForWhatIsLoaded(t *testing.T) {
+	e := newTwoPrinters(t)
+	esp := func(query string) (int, map[string]any) {
+		return e.do("GET", "/board/next?"+query, boardToken, nil)
+	}
+	submit := func(job map[string]any) string {
+		t.Helper()
+		job["printer"] = "ptouch"
+		code, body := e.do("POST", "/api/jobs", clientToken, job)
+		if code != 201 {
+			t.Fatalf("submit: %d %v", code, body)
+		}
+		return fmt.Sprintf("/api/jobs/%v", body["id"])
+	}
+	esp("media=tape-24")
+
+	// Text is drawn for the tape that's in when the board asks.
+	submit(map[string]any{"kind": "text", "lines": []string{"A"}})
+	if code, sent := esp("media=tape-12"); code != 200 || raster(sent)["media"] != "tape-12" || raster(sent)["dots"] != 70.0 {
+		t.Errorf("text on other tape: %d %v", code, raster(sent)["media"])
+	}
+
+	for _, tt := range []struct {
+		name, poll, code string
+		job              map[string]any
+	}{
+		{"two lines", "media=tape-12", "bad_text", map[string]any{"kind": "text", "lines": []string{"A", "B"}}},
+		{"image", "media=tape-12", "tape_mismatch", map[string]any{"kind": "image", "tape_mm": 24, "image": pngB64(t, 128)}},
+		{"media named", "media=tape-12", "wrong_media", map[string]any{"kind": "barcode", "text": "A", "media": "tape-24"}},
+		{"problem", "media=&problem=not_connected", "not_connected", map[string]any{"kind": "barcode", "text": "A"}},
+		{"unknown media", "media=tape-99", "unsupported_tape", map[string]any{"kind": "barcode", "text": "A"}},
+	} {
+		esp("media=tape-24")
+		path := submit(tt.job)
+		if code, sent := esp(tt.poll); code != 204 {
+			t.Errorf("%s: the board got %d %v", tt.name, code, sent)
+		}
+		_, job := e.do("GET", path, clientToken, nil)
+		res, _ := job["result"].(map[string]any)
+		if job["status"] != "failed" || res["code"] != tt.code || res["printed"] != false || res["may_have_printed"] != nil {
+			t.Errorf("%s: %v %v, want failed %s", tt.name, job["status"], res, tt.code)
+		}
+		if code, _ := esp("media=tape-24"); code != 204 {
+			t.Errorf("%s: the failed job was sent later", tt.name)
+		}
+	}
+
+	// The old Pi draws its own.
+	esp("media=tape-24")
+	submit(map[string]any{"kind": "text", "lines": []string{"A"}})
+	if code, sent := e.poll("24"); code != 200 || raster(sent) != nil || len(sent["lines"].([]any)) != 1 {
+		t.Errorf("the Pi got %d %v", code, sent)
+	}
+}
+
+func TestTooLongIsRefusedAtOnce(t *testing.T) {
+	e := newTwoPrinters(t)
+	e.poll("24")
+	for _, job := range []map[string]any{
+		{"kind": "text", "lines": []string{strings.Repeat("W", 60)}, "printer": "ptouch"},
+		{"kind": "text", "lines": []string{"日本"}, "printer": "ptouch"},
+	} {
+		if code, body := e.do("POST", "/api/jobs", clientToken, job); code != 400 {
+			t.Errorf("%v: %d %v", job["lines"], code, body)
+		}
 	}
 }
 
@@ -145,6 +227,7 @@ func TestLabelWriterJobs(t *testing.T) {
 		{"nine lines", map[string]any{"kind": "text", "lines": nine}, 400, "bad_text"},
 		{"no lines", map[string]any{"kind": "text"}, 400, "bad_text"},
 		{"not ASCII", map[string]any{"kind": "text", "lines": []string{"A", "café"}}, 400, "bad_text"},
+		{"too many to fit", map[string]any{"kind": "text", "lines": nine[:8], "orientation": "landscape"}, 400, "too_long"},
 		{"long line", map[string]any{"kind": "text", "lines": []string{strings.Repeat("x", 81)}}, 400, "bad_text"},
 		{"image for tape", map[string]any{"kind": "image", "image": pngSize(t, 400, 128)}, 422, "wrong_size"},
 		{"image turned", map[string]any{"kind": "image", "image": pngSize(t, 950, 400)}, 422, "wrong_size"},
@@ -156,7 +239,7 @@ func TestLabelWriterJobs(t *testing.T) {
 		}
 	}
 	for _, job := range []map[string]any{
-		{"kind": "text", "lines": nine[:8], "orientation": "landscape", "media": "large-address"},
+		{"kind": "text", "lines": nine[:8], "size": "small", "media": "large-address"},
 		{"kind": "image", "image": pngSize(t, 400, 950)},
 	} {
 		job["printer"] = "office-dymo"
@@ -164,9 +247,10 @@ func TestLabelWriterJobs(t *testing.T) {
 			t.Errorf("good %s: %d %v", job["kind"], code, body)
 		}
 	}
-	if _, sent := e.pollDymo("media=large-address"); len(sent["lines"].([]any)) != 8 || sent["orientation"] != "landscape" ||
-		sent["size"] != "large" || sent["align"] != "left" || sent["media"] != "large-address" {
-		t.Errorf("board got %v", sent)
+	for range 2 {
+		if code, sent := e.pollDymo("media=large-address"); code != 200 || raster(sent)["rows"] != 950.0 {
+			t.Errorf("board got %d, %v rows", code, raster(sent)["rows"])
+		}
 	}
 
 	// The P-touch is as it was: no orientation, and two lines at most.

@@ -25,7 +25,7 @@ const (
 	lineGap     = 0.1  // between two lines, as a fraction of a line's height
 	twoLineMM   = 24   // the narrowest tape that takes a second line
 	metricsSize = 100  // the size the font's proportions are measured at
-	dieCutLines = 8    // the most lines a LabelWriter's board draws
+	dieCutLines = 8    // the most lines on a LabelWriter's label
 )
 
 var sizes = map[string]float64{"large": 1, "medium": 0.75, "small": 0.5}
@@ -64,8 +64,7 @@ func CheckText(t TextLabel, tapeMM int) (TextLabel, error) {
 	return cleanText(t)
 }
 
-// CheckDieCutText is CheckText for a LabelWriter, whose board draws text itself
-// (firmware/components/label/label.c): more lines, but only ASCII.
+// CheckDieCutText is CheckText for a LabelWriter: more lines, but only ASCII.
 func CheckDieCutText(t TextLabel) (TextLabel, error) {
 	if len(t.Lines) == 0 || len(t.Lines) > dieCutLines {
 		return TextLabel{}, textErr(wire.CodeBadText, "a text label has 1 to %d lines", dieCutLines)

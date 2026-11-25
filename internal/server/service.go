@@ -101,10 +101,46 @@ func (s *Service) Next(ctx context.Context, printer string, poll Poll) (*wire.Jo
 		log.Info("printer ready again", "was", was)
 	}
 	job, err := s.store.Claim(ctx, p.Name, now)
-	if job != nil {
-		log.Info("job sent", "job", job.ID, "kind", job.Kind)
+	if job == nil || err != nil {
+		return nil, err
 	}
-	return job, err
+	if !poll.Draws {
+		drawn, failed := s.draw(job, p.Family, media, problem)
+		if failed != nil {
+			// Nothing was sent, so it's over: jobs are never requeued.
+			log.Warn("job not sent", "job", job.ID, "kind", job.Kind, "code", failed.Code, "err", failed.Error)
+			return nil, s.store.Finish(ctx, p.Name, job.ID, *failed, s.now())
+		}
+		job = drawn
+	}
+	log.Info("job sent", "job", job.ID, "kind", job.Kind)
+	return job, nil
+}
+
+// draw makes a claimed job the raster its board prints on the loaded media, or
+// says why it can't: the media may have changed since it was submitted.
+func (s *Service) draw(job *wire.Job, family string, media wire.Media, problem string) (*wire.Job, *wire.Result) {
+	fail := func(code, format string, args ...any) (*wire.Job, *wire.Result) {
+		r := wire.Failed(code, fmt.Sprintf(format, args...))
+		r.LoadedMedia, r.LoadedTapeMM = media.ID, media.TapeMM
+		return nil, &r
+	}
+	switch {
+	case problem != "":
+		return fail(problem, "%s", fix(family, problem))
+	case job.Media != "" && job.Media != media.ID:
+		return fail(wire.CodeWrongMedia, "the job is for %s but %s is loaded", job.Media, media.ID)
+	case job.Kind == wire.KindImage && job.TapeMM != media.TapeMM:
+		return fail(wire.CodeTapeMismatch, "image is for %d mm tape but %d mm is loaded", job.TapeMM, media.TapeMM)
+	}
+	raster, err := label.Draw(*job, media)
+	if te, ok := errors.AsType[*label.TextError](err); ok {
+		return fail(te.Code, "%s", te.Msg)
+	}
+	if err != nil {
+		return fail(wire.CodeInternal, "drawing the label: %v", err)
+	}
+	return &wire.Job{ID: job.ID, Kind: job.Kind, Raster: raster}, nil
 }
 
 // Report records the result of a job the printer's board took.
@@ -181,7 +217,6 @@ func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.J
 	}
 	switch job.Kind {
 	case wire.KindText:
-		// What needs drawing (glyphs, whether it fits) is checked on the board.
 		t := label.TextLabel{Lines: job.Lines, Size: job.Size, Align: job.Align}
 		if p.Family == wire.FamilyPTouch {
 			t, err = label.CheckText(t, st.TapeMM)
@@ -206,6 +241,18 @@ func (s *Service) Submit(ctx context.Context, who string, req wire.Job) (store.J
 			return store.Job{}, refuse(http.StatusUnprocessableEntity, "wrong_height",
 				"image is %d dots high; %d mm tape needs %d", size.Height, st.TapeMM, st.HeightDots)
 		}
+	}
+
+	// Drawing it is how to know it fits. It is drawn again for the board.
+	media, ok := wire.FindMedia(p.Family, st.Media)
+	if !ok {
+		return store.Job{}, fmt.Errorf("%s has unknown media %q", p.Name, st.Media)
+	}
+	if _, err := label.Draw(job, media); err != nil {
+		if te, ok := errors.AsType[*label.TextError](err); ok {
+			return store.Job{}, refuse(http.StatusBadRequest, te.Code, "%s", te.Msg)
+		}
+		return store.Job{}, err
 	}
 
 	j, err := s.store.Add(ctx, job, who, s.now())

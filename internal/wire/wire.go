@@ -7,8 +7,11 @@
 // the printer can't print, the poll says media= (empty) and adds ProblemParam
 // with the reason, one of the result codes (editor_lite, printer_error, …); a
 // poll without it means the printer is ready. WiFiParam, when present, is the
-// name of the Wi-Fi network the board is on. A P-touch board may send TapeParam
-// (tape_mm=N, or 0) in place of MediaParam.
+// name of the Wi-Fi network the board is on. The server draws the label for the
+// media the poll says, so the job is a Raster.
+//
+// The Raspberry Pi board this replaces sends TapeParam (tape_mm=N, or 0) in place
+// of MediaParam, and gets the job as it was submitted, to draw itself.
 package wire
 
 import (
@@ -131,19 +134,31 @@ type Job struct {
 	ID      int64  `json:"id"`
 	Printer string `json:"printer,omitempty"` // which printer; only on submit, as a board only gets its own jobs
 	Kind    string `json:"kind"`
-	// The media the job is for. Always set for a LabelWriter's board, which
-	// must not print the job on any other; a P-touch's board doesn't check it.
+	// The media the job is for. Always set for a LabelWriter; for a P-touch, only
+	// when whoever submitted it said so.
 	Media       string `json:"media,omitempty"`
 	Orientation string `json:"orientation,omitempty"` // LabelWriter text and barcodes: portrait or landscape
 	Text        string `json:"text,omitempty"`        // barcode
-	// Text jobs: one or two lines on tape, up to eight on a LabelWriter, drawn
-	// on the board for the loaded media.
+	// Text jobs: one or two lines on tape, up to eight on a LabelWriter, drawn for
+	// the loaded media.
 	Lines []string `json:"lines,omitempty"`
 	Size  string   `json:"size,omitempty"`  // large, medium or small
 	Align string   `json:"align,omitempty"` // left, center or right
 	// Image jobs: the PNG, and for a P-touch the tape it was rendered for.
 	TapeMM int    `json:"tape_mm,omitempty"`
 	Image  []byte `json:"image,omitempty"`
+	// What a board that polls with MediaParam gets in place of the fields above.
+	Raster *Raster `json:"raster,omitempty"`
+}
+
+// Raster is a drawn label: Rows rows of Dots dots each across the print head, in
+// feed order. A row is (Dots+7)/8 bytes; bit 7 of the first is the first dot, and
+// 1 is black. The board must not print it on any media but Media.
+type Raster struct {
+	Media string `json:"media"`
+	Dots  int    `json:"dots"`
+	Rows  int    `json:"rows"`
+	Data  []byte `json:"data"`
 }
 
 // Result is the outcome of a job. Code is empty when the label printed;
