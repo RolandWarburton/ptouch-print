@@ -5,6 +5,8 @@
 #define CODE_OK "" // not sent
 
 #define CODE_BUSY "busy"
+#define CODE_EDITOR_LITE "editor_lite"
+#define CODE_NOT_CONNECTED "not_connected"
 #define CODE_NO_REPLY "no_reply"
 #define CODE_PRINT_FAILED "print_failed" // the printer reported an error after the job was sent
 #define CODE_PRINTER_ERROR "printer_error"

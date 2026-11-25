@@ -163,7 +163,7 @@ static const char *error(void) { return s_err; }
 extern const uint8_t sample_start[] asm("_binary_sample_rows_start");
 extern const uint8_t sample_end[] asm("_binary_sample_rows_end");
 
-static const usb_id_t ids[] = {{0x0922, 0x0020}};
+static const usb_id_t ids[] = {{0x0922, 0x0020, NULL}};
 
 const driver_t dymo450_driver = {
     .ids = ids,

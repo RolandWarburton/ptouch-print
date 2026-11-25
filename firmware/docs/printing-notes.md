@@ -69,14 +69,20 @@ Checked 2026-11-25 with 24 mm laminated tape: 100 status requests and one 31 mm 
 - VID `0x04f9`, PID `0x2061`, one printer-class interface, bulk OUT `0x02`, bulk IN
   `0x81`, 64-byte packets. Self-powered (asks for 0 mA).
 - With nothing to say it answers a bulk IN with an **empty packet**, so reads don't hang
-  and must be polled. No read timed out, so recovery from a timeout is untried.
+  and must be polled. 154 reads canceled at once (a timeout of 0) did no harm: the
+  endpoint worked on.
+- Its port was cut in software and restored 25 times, and it was found again each time. Cut
+  1 s into a print, the label still came out, so `unconfirmed` may well have printed; cut
+  after 20 ms, none did. While it finishes such a label it doesn't answer (`no_reply`).
 - Status comes within 2 ms as one 32-byte packet: `80 20 42 30 67 30 00 00 00 00 18 01`,
   then zeros but for bytes 24 and 25 (`01 08`). Byte 18 is `0` in a reply.
 - A job is followed by messages the printer sends by itself: type `6` at once, then type
   `1` (completed) about 6 s later, cutting included.
 - The job sent in 3200-byte chunks prints as Go's single write did. The picture's top is
   pin 0, and its first row is the label's left end.
-- Not tried: 12 mm tape, long labels, errors, Editor Lite, the printer's sleep, replugging.
+- Text, a barcode and a PNG drawn by the server printed right.
+- Not tried: 12 mm tape, long labels, errors, Editor Lite, the printer's sleep, replugging
+  by hand.
 
 ## LabelWriter 450 (start here)
 

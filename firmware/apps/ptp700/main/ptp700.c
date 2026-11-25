@@ -209,7 +209,10 @@ static const char *driver_error(void) { return s_p.err; }
 extern const uint8_t sample_start[] asm("_binary_sample_rows_start");
 extern const uint8_t sample_end[] asm("_binary_sample_rows_end");
 
-static const usb_id_t ids[] = {{0x04f9, 0x2061}};
+static const usb_id_t ids[] = {
+    {0x04f9, 0x2061, NULL},
+    {0x04f9, 0x2064, CODE_EDITOR_LITE}, // its mass-storage mode
+};
 
 const driver_t ptp700_driver = {
     .ids = ids,

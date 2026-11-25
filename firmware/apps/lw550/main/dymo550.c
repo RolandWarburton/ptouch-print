@@ -227,8 +227,8 @@ extern const uint8_t sample_start[] asm("_binary_sample_rows_start");
 extern const uint8_t sample_end[] asm("_binary_sample_rows_end");
 
 static const usb_id_t ids[] = {
-    {0x0922, 0x0028}, // LabelWriter 550, not tried
-    {0x0922, 0x0029}, // LabelWriter 550 Turbo
+    {0x0922, 0x0028, NULL}, // LabelWriter 550, not tried
+    {0x0922, 0x0029, NULL}, // LabelWriter 550 Turbo
 };
 
 const driver_t dymo550_driver = {

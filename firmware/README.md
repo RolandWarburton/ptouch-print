@@ -21,8 +21,8 @@ make flash APP=lw550 PORT=/dev/ttyACM0      # the board's UART port
 make monitor APP=lw550
 ```
 
-An app prints its built-in sample label only if you press `t` in the monitor within
-30 s of the printer being found. `tools/sample` draws the samples.
+The printer can be unplugged and replugged at any time; the monitor shows its state
+when it changes. An app prints its built-in sample label only if you press `t` there. `tools/sample` draws the samples.
 
 Plug the printer into the board's other USB-C port (the native USB one, GPIO19/20)
 and give that port 5 V. Logs go to the UART port. `docs/printing-notes.md` has the
