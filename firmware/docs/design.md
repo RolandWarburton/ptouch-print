@@ -81,17 +81,20 @@ print, it sends `media=` empty and `problem=<code>`, and may add `wifi=<name>`.
 
 ## The ESP32-S3 board
 
-Modules:
+Each device type has its own firmware in `apps/`, made of a driver and the shared
+`components/`:
 
 - `label`: draws text and Code 128 on a canvas and produces the head's raster
-  rows. Plain C, runs on a development machine.
-- `media`: the media table and lookup by id.
-- `dymo450` / `dymo550`: print a drawn label, check status. `dymo550_proto` is
-  the 550's parsing, in plain C. The 450's code is still in `main.c`.
-- `usb_io`: one bulk transfer with a timeout.
-- `config`: Wi-Fi credentials, server URL, board token and media id, from
-  NVS with build-time defaults.
-- `wifi`, `poller`: join the network and run the poll loop over HTTPS.
+  rows, with the media table and lookup by id. Plain C, runs on a development
+  machine.
+- `usb_printer`: finds the app's printer by its USB ids; `usb_io` runs one bulk
+  transfer with a timeout.
+- `board`: calls the app's `driver_t`. Still only prints samples; to come are
+  settings (Wi-Fi credentials, server URL, board token and media id, from NVS and
+  never built in), joining the network and the poll loop over HTTPS.
+
+`apps/lw450` and `apps/lw550` have the drivers; `dymo550_proto` is the 550's parsing,
+in plain C.
 
 Print flow for a job: check the job's media against the loaded media, draw the
 label, check the printer is idle, stream it, read the status, report the
@@ -102,7 +105,7 @@ result. A job that fails or might have printed is not retried.
 1. Board: media table and stock setting (done), then `config`, `wifi`.
 2. Board: `poller` against a local copy of the server.
 3. Server: printers, per-printer state, media-aware refusals, schema, `printer`
-   on REST, MCP and the web UI. (Built on ptouch-print's `multiple-printers` branch;
+   on REST, MCP and the web UI. (Built on the `multiple-printers` branch;
    not deployed or tried with this board yet. `lw550` is refused until step 4.)
 4. LW550 support: lock handshake, status and NFC media. (Board side done in
-   `dymo550`; the server still refuses `lw550`.)
+   `apps/lw550`; the server still refuses `lw550`.)

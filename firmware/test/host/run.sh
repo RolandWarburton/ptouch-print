@@ -4,10 +4,14 @@
 set -e
 cd "$(dirname "$0")/../.."
 mkdir -p test/out
-gcc -Wall -Wextra -Imain -o test/out/label_host test/host/label_host.c main/label.c main/font_data.c
+LABEL="-Icomponents/label/include components/label/label.c components/label/font_data.c"
+gcc -Wall -Wextra -o test/out/label_host test/host/label_host.c $LABEL
 
-gcc -Wall -Wextra -Imain -o test/out/dymo550_host test/host/dymo550_host.c main/dymo550_proto.c main/label.c main/font_data.c
+gcc -Wall -Wextra -Iapps/lw550/main -o test/out/dymo550_host test/host/dymo550_host.c apps/lw550/main/dymo550_proto.c $LABEL
 test/out/dymo550_host
+
+gcc -Wall -Wextra -Iapps/ptp700/main -o test/out/ptp700_host test/host/ptp700_host.c apps/ptp700/main/ptp700_proto.c
+test/out/ptp700_host
 
 SAMPLES="TG17573 12345678 1234567 123 Hello_123 ab12345cd 99887766abcd"
 (cd tools/code128ref && go run . $SAMPLES) > test/out/code128.expected

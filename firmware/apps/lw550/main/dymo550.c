@@ -18,17 +18,11 @@ static const char *TAG = "dymo550";
 
 enum { STATUS_ONLY = 0, TAKE_LOCK = 1 }; // ESC A's parameter
 
-esp_err_t lw5_open(lw5_t *p, usb_device_handle_t dev, uint8_t ep_out, uint8_t ep_in)
-{
-    *p = (lw5_t){.dev = dev, .ep_out = ep_out, .ep_in = ep_in};
-    return usb_host_transfer_alloc(XFER_BYTES, 0, &p->t);
-}
-
-void lw5_close(lw5_t *p)
-{
-    usb_host_transfer_free(p->t);
-    p->t = NULL;
-}
+typedef struct {
+    usb_printer_t usb;
+    usb_transfer_t *t;
+    char err[96]; // says what's wrong after a failure
+} lw5_t;
 
 static const char *fail(lw5_t *p, const char *code, const char *why)
 {
@@ -39,7 +33,7 @@ static const char *fail(lw5_t *p, const char *code, const char *why)
 static esp_err_t send(lw5_t *p, const uint8_t *b, size_t n)
 {
     memcpy(p->t->data_buffer, b, n);
-    return usb_io_xfer(p->dev, p->t, p->ep_out, n, PRINT_MS);
+    return usb_io_xfer(p->usb.dev, p->t, p->usb.ep_out, n, PRINT_MS);
 }
 
 #define SEND(p, ...) send(p, (const uint8_t[]){__VA_ARGS__}, sizeof((const uint8_t[]){__VA_ARGS__}))
@@ -48,7 +42,7 @@ static esp_err_t ask(lw5_t *p, uint8_t lock, int timeout_ms, lw5_status_t *s)
 {
     esp_err_t err = SEND(p, 0x1b, 0x41, lock); // ESC A
     if (err == ESP_OK) {
-        err = usb_io_xfer(p->dev, p->t, p->ep_in, 64, timeout_ms);
+        err = usb_io_xfer(p->usb.dev, p->t, p->usb.ep_in, 64, timeout_ms);
     }
     if (err == ESP_OK && !lw5_parse_status(p->t->data_buffer, p->t->actual_num_bytes, s)) {
         err = ESP_ERR_INVALID_RESPONSE;
@@ -65,31 +59,26 @@ static const char *acquire(lw5_t *p, lw5_status_t *s)
     for (int waited = 0;; waited += LOCK_POLL_MS) {
         if (ask(p, TAKE_LOCK, REPLY_MS, s) != ESP_OK) {
             release(p); // the lock may have been granted
-            return fail(p, "no_reply", "the printer didn't answer");
+            return fail(p, CODE_NO_REPLY, "the printer didn't answer");
         }
         bool refused = s->state == LW5_NOT_LOCKED || s->state == LW5_WAKING;
         const char *problem = lw5_problem(s);
         if (s->state == LW5_IDLE && !problem) {
-            return LW5_OK;
+            return CODE_OK;
         }
         if (!refused && problem) {
             release(p);
-            return fail(p, "printer_error", problem);
+            return fail(p, CODE_PRINTER_ERROR, problem);
         }
         if (waited >= LOCK_MS) {
             if (!refused) {
                 release(p);
             }
-            return problem ? fail(p, "printer_error", problem)
-                           : fail(p, "busy", "the printer is busy, or another computer is using it");
+            return problem ? fail(p, CODE_PRINTER_ERROR, problem)
+                           : fail(p, CODE_BUSY, "the printer is busy, or another computer is using it");
         }
         vTaskDelay(pdMS_TO_TICKS(LOCK_POLL_MS));
     }
-}
-
-const char *lw5_status(lw5_t *p, lw5_status_t *s)
-{
-    return ask(p, STATUS_ONLY, REPLY_MS, s) == ESP_OK ? LW5_OK : fail(p, "no_reply", "the printer didn't answer");
 }
 
 static const char *media_from(lw5_t *p, const lw5_status_t *s, const media_t **media)
@@ -97,12 +86,14 @@ static const char *media_from(lw5_t *p, const lw5_status_t *s, const media_t **m
     *media = media_find_sku(s->sku);
     if (!*media) {
         snprintf(p->err, sizeof p->err, "labels \"%s\" aren't in the media table", s->sku);
-        return "unsupported_media";
+        return CODE_UNSUPPORTED_MEDIA;
     }
-    return LW5_OK;
+    return CODE_OK;
 }
 
-const char *lw5_loaded_media(lw5_t *p, lw5_status_t *s, const media_t **media)
+// Finds out which labels are loaded, taking the lock briefly because the printer
+// doesn't say without it.
+static const char *loaded_media(lw5_t *p, lw5_status_t *s, const media_t **media)
 {
     *media = NULL;
     const char *code = acquire(p, s);
@@ -110,8 +101,9 @@ const char *lw5_loaded_media(lw5_t *p, lw5_status_t *s, const media_t **media)
         return code;
     }
     if (release(p) != ESP_OK) {
-        return fail(p, "no_reply", "the printer didn't take the end of the job");
+        return fail(p, CODE_NO_REPLY, "the printer didn't take the end of the job");
     }
+    ESP_LOGI(TAG, "%u labels left", s->labels_left);
     return media_from(p, s, media);
 }
 
@@ -145,12 +137,12 @@ static esp_err_t send_label(lw5_t *p, const label_t *l)
             label_head_row(l, y, row);
             memcpy(p->t->data_buffer + n, row, row_bytes);
         }
-        err = usb_io_xfer(p->dev, p->t, p->ep_out, n, PRINT_MS);
+        err = usb_io_xfer(p->usb.dev, p->t, p->usb.ep_out, n, PRINT_MS);
     }
     return err;
 }
 
-const char *lw5_print(lw5_t *p, const label_t *l)
+static const char *print(lw5_t *p, const label_t *l)
 {
     lw5_status_t s;
     const char *code = acquire(p, &s);
@@ -161,7 +153,7 @@ const char *lw5_print(lw5_t *p, const label_t *l)
     code = media_from(p, &s, &loaded);
     if (*code == 0 && loaded != l->media) {
         snprintf(p->err, sizeof p->err, "the label is for %s but %s is loaded", l->media->id, loaded->id);
-        code = "wrong_media";
+        code = CODE_WRONG_MEDIA;
     }
     if (*code) {
         release(p);
@@ -181,7 +173,7 @@ const char *lw5_print(lw5_t *p, const label_t *l)
         // If it stopped mid-raster the printer may take this as dots.
         release(p);
         snprintf(p->err, sizeof p->err, "lost the printer while printing: %s", esp_err_to_name(err));
-        return "unconfirmed";
+        return CODE_UNCONFIRMED;
     }
     const char *problem = lw5_problem(&s);
     // The last label can leave the bay empty; that doesn't mean it failed.
@@ -193,10 +185,52 @@ const char *lw5_print(lw5_t *p, const label_t *l)
     err = SEND(p, 0x1b, 0x45); // ESC E: feed to the tear bar
     esp_err_t released = release(p);
     if (problem) {
-        return fail(p, "print_failed", problem);
+        return fail(p, CODE_PRINT_FAILED, problem);
     }
     if (err != ESP_OK || released != ESP_OK) {
-        return fail(p, "unconfirmed", "the printer didn't take the end of the job");
+        return fail(p, CODE_UNCONFIRMED, "the printer didn't take the end of the job");
     }
-    return LW5_OK;
+    return CODE_OK;
 }
+
+// ---- Driver -----------------------------------------------------------------
+
+static lw5_t s_p;
+
+static esp_err_t driver_open(const usb_printer_t *usb)
+{
+    s_p = (lw5_t){.usb = *usb};
+    return usb_host_transfer_alloc(XFER_BYTES, 0, &s_p.t);
+}
+
+static void driver_close(void)
+{
+    usb_host_transfer_free(s_p.t);
+    s_p.t = NULL;
+}
+
+static const char *driver_state(const media_t **media)
+{
+    lw5_status_t s;
+    return loaded_media(&s_p, &s, media);
+}
+
+static const char *driver_print(const label_t *l) { return print(&s_p, l); }
+
+static const char *driver_error(void) { return s_p.err; }
+
+static const usb_id_t ids[] = {
+    {0x0922, 0x0028}, // LabelWriter 550, not tried
+    {0x0922, 0x0029}, // LabelWriter 550 Turbo
+};
+
+const driver_t dymo550_driver = {
+    .ids = ids,
+    .n_ids = sizeof ids / sizeof ids[0],
+    .sample = "Dymo 550",
+    .open = driver_open,
+    .close = driver_close,
+    .state = driver_state,
+    .print = driver_print,
+    .error = driver_error,
+};

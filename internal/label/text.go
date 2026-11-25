@@ -65,7 +65,7 @@ func CheckText(t TextLabel, tapeMM int) (TextLabel, error) {
 }
 
 // CheckDieCutText is CheckText for a LabelWriter, whose board draws text itself
-// (dymo-print's label.c): more lines, but only ASCII.
+// (firmware/components/label/label.c): more lines, but only ASCII.
 func CheckDieCutText(t TextLabel) (TextLabel, error) {
 	if len(t.Lines) == 0 || len(t.Lines) > dieCutLines {
 		return TextLabel{}, textErr(wire.CodeBadText, "a text label has 1 to %d lines", dieCutLines)

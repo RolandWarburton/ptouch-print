@@ -1,6 +1,6 @@
-// Command genfont rasterizes the label fonts into main/font_data.c.
+// Command genfont rasterizes the label fonts into components/label/font_data.c.
 //
-//	cd tools/genfont && go run . > ../../main/font_data.c
+//	cd tools/genfont && go run . > ../../components/label/font_data.c
 package main
 
 import (

@@ -124,4 +124,4 @@ checked when the cassette is inserted).** LPrint has no 550 support.
 1. Bring-up firmware: host stack, print VID/PID and descriptors (endpoint
    addresses) of whatever is plugged in.
 2. 450: send ESC V / ESC A, then a test bitmap using the stream above.
-3. 550: implement the lock handshake after the 450 works. (Done: `dymo550`.)
+3. 550: implement the lock handshake after the 450 works. (Done: `apps/lw550`.)

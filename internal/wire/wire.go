@@ -1,6 +1,6 @@
 // Package wire holds what the boards and the command server send each other, so
 // they can't disagree about the format. The LabelWriter board is firmware in
-// another repo (dymo-print) that keeps its own copy of this.
+// firmware/ with its own copy of this; firmware_test.go keeps the two alike.
 //
 // A board asks for work with GET NextPath?media=ID, getting a Job (200) or
 // nothing (204), and reports each job it took with POST ResultPath(id). When
@@ -87,7 +87,7 @@ const (
 // Media is one kind of label stock. Width and Length are the printable dots
 // across the head and along the feed; Length is 0 for tape, which is cut to fit
 // the label. Pitch is a label's length from one to the next, in dots. The
-// LabelWriter's rows match media_t in dymo-print's label.c.
+// LabelWriter's rows match media_t in firmware/components/label/label.c.
 type Media struct {
 	ID     string
 	Name   string
