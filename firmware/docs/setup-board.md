@@ -7,7 +7,7 @@ Each type of printer has its own firmware and family:
 
 | Printer | Firmware (`APP`) | Family |
 |---|---|---|
-| Brother PT-P700 | `ptp700` | `ptouch` |
+| Brother PT-P700 | `ptp700` | `pt-p700` |
 | DYMO LabelWriter 450 | `lw450` | `lw450` |
 | DYMO LabelWriter 550, 550 Turbo | `lw550` | `lw550` |
 
@@ -39,9 +39,8 @@ entry, separated by a comma from any others, and restart with `docker compose up
 
 Each printer needs its own token. With more than one printer, every job has to name one.
 
-> Replacing a board keeps the printer's name: replace its entry instead of adding one. If
-> `.env` has `PTOUCH_BOARD_TOKEN_SHA256`, that is the printer `ptouch`; remove it when you add
-> `ptouch` to `PRINT_PRINTERS`. Stop the old board first.
+> Replacing a board keeps the printer's name: replace its entry instead of adding one. Stop
+> the old board first.
 
 ## 2. Flash the firmware
 
@@ -54,28 +53,28 @@ make flash APP=lw550 PORT=/dev/ttyACM0
 
 ## 3. Write its settings
 
-Copy the example. `settings*.csv` is gitignored; never commit one.
+Copy the example. `settings*.toml` is gitignored; never commit one.
 
 ```sh
-cp settings.example.csv settings.office-dymo.csv
-chmod 600 settings.office-dymo.csv
+cp settings.example.toml settings.office-dymo.toml
+chmod 600 settings.office-dymo.toml
 ```
 
-Fill in the last column:
+Fill it in:
 
 | Key | Value |
 |---|---|
 | `server` | the server's URL, which must be `https://` |
 | `token` | the token from step 1 |
-| `ssid1`, `pass1` | the Wi-Fi network to prefer |
-| `ssid2`, `pass2` | the one to fall back to; up to `ssid4` |
-| `media` | LabelWriter 450 only, which can't tell what's in it: `large-address` |
+| `media` | LabelWriter 450 only, which can't tell what's in it: `large-address`. Leave it out otherwise. |
+| `[[wifi]]` | a network, with its `ssid` and `pass`. Add one for each, up to four, the one to prefer first. |
 
-Remove the lines you don't need. Put a value with a comma or a double quote in it in double
-quotes, doubling any inside: `"say ""hi"", then go"`.
+Remove what you don't need. Strings are in double quotes; a backslash or double quote in a
+password is written `\\` or `\"`, or put the value in single quotes to write it as it is.
+`make settings` refuses a file with a missing or oversized value.
 
 ```sh
-make settings SETTINGS=settings.office-dymo.csv PORT=/dev/ttyACM0
+make settings SETTINGS=settings.office-dymo.toml PORT=/dev/ttyACM0
 ```
 
 That replaces all the board's settings. They survive flashing firmware. Afterwards delete

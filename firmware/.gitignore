@@ -10,5 +10,5 @@ CLAUDE.md
 test/out/
 
 # The boards' settings: Wi-Fi passwords and tokens.
-settings*.csv
-!settings.example.csv
+settings*.toml
+!settings.example.toml

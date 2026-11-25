@@ -31,7 +31,7 @@ protocols and wiring, `docs/design.md` the design.
 ## Setting up a board
 
 See [docs/setup-board.md](docs/setup-board.md). In short: `make flash APP=...`, then
-`make settings SETTINGS=settings.<board>.csv`, from a copy of `settings.example.csv`.
+`make settings SETTINGS=settings.<board>.toml`, from a copy of `settings.example.toml`.
 
 The settings are kept in the board's flash, unencrypted, and survive flashing firmware. Never
 build them in. The server must be `https://`.

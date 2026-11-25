@@ -1,4 +1,4 @@
-// The board's settings, from NVS. They are never built in: see settings.example.csv.
+// The board's settings, from NVS. They are never built in: see settings.example.toml.
 #pragma once
 
 #include <stdbool.h>

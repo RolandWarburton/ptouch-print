@@ -35,12 +35,14 @@ flash: need-app
 monitor: need-app
 	$(DOCKER) -it $(SERIAL) $(IMAGE) idf.py -p $(PORT) monitor
 
-# Write a board's settings, from a file like settings.example.csv. They replace all
-# it has: make settings SETTINGS=settings.ptp700.csv
+# Write a board's settings, from a file like settings.example.toml. They replace all
+# it has: make settings SETTINGS=settings.ptp700.toml
 settings:
 	@test -f "$(SETTINGS)" || { echo "say which file: make settings SETTINGS=..." >&2; exit 1; }
-	docker run --rm -v $(abspath $(SETTINGS)):/settings.csv:ro -u $(shell id -u):$(shell id -g) -e HOME=/tmp $(SERIAL) $(IMAGE) \
-		bash -c 'python $$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate /settings.csv /tmp/nvs.bin 0x6000 && \
+	docker run --rm -v $(abspath $(SETTINGS)):/settings.toml:ro -v $(CURDIR)/tools/settings_to_nvs.py:/settings_to_nvs.py:ro \
+		-u $(shell id -u):$(shell id -g) -e HOME=/tmp $(SERIAL) $(IMAGE) \
+		bash -c 'python /settings_to_nvs.py /settings.toml /tmp/settings.csv && \
+		python $$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate /tmp/settings.csv /tmp/nvs.bin 0x6000 && \
 		esptool.py --chip esp32s3 -p $(PORT) write_flash 0x9000 /tmp/nvs.bin'
 
 # Where the firmware's RAM and flash go (run make build first).
