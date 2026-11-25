@@ -1,10 +1,13 @@
 #include "net.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
+#include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
 #include "esp_sntp.h"
@@ -45,12 +48,24 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
+// Names the board to the network by its firmware and MAC address, such as
+// label-ptp700-d0d4.
+static void set_hostname(esp_netif_t *netif)
+{
+    uint8_t mac[6];
+    char name[33];
+    ESP_ERROR_CHECK(esp_read_mac(mac, ESP_MAC_WIFI_STA));
+    snprintf(name, sizeof name, "label-%.20s-%02x%02x", esp_app_get_description()->project_name, mac[4], mac[5]);
+    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, name));
+    ESP_LOGI(TAG, "hostname %s, MAC " MACSTR, name, MAC2STR(mac));
+}
+
 void net_start(void)
 {
     s_events = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    set_hostname(esp_netif_create_default_wifi_sta());
     const wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));

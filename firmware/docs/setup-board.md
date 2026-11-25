@@ -124,6 +124,10 @@ On the server, a printer whose board hasn't asked for a minute is `printer_offli
 
 ## Wi-Fi
 
+A board calls itself `label-<firmware>-<end of its MAC address>`, such as
+`label-ptp700-d0d4`; the monitor shows it and the whole address. Nothing connects to it: the
+name is for whoever runs the network.
+
 Networks are tried in order, taking each one's strongest access point. On a later network
 the board looks for an earlier one every minute and moves to it. If it can't reach the server
 for 5 minutes it tries another network, and leaves that one alone for 10. `/api/status` has
